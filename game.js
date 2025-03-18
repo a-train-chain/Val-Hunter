@@ -2522,6 +2522,7 @@ function handleGoalReached() {
     const healthPercentage = window.gameState.playerHealth / window.config.playerHealth;
     const healthBonus = Math.floor(5000 * healthPercentage);
     const damagePenalty = window.gameState.damageTaken * 50;
+    const missedProjectilesPenalty = (window.gameState.missedProjectiles || 0) * 100;
     const finalScore = calculateFinalScore();
     
     // Create missed intervals HTML
@@ -2773,19 +2774,23 @@ function restartGame() {
         
         // Clean up any existing game elements
         // Remove enemies from scene
-        window.enemies.forEach(enemy => {
-            if (enemy && window.scene) {
-                window.scene.remove(enemy);
-            }
-        });
+        if (window.enemies && window.enemies.length > 0) {
+            window.enemies.forEach(enemy => {
+                if (enemy && window.scene) {
+                    window.scene.remove(enemy);
+                }
+            });
+        }
         window.enemies = [];
         
         // Clear projectiles
-        window.projectiles.forEach(projectile => {
-            if (projectile && window.scene) {
-                window.scene.remove(projectile);
-            }
-        });
+        if (window.projectiles && window.projectiles.length > 0) {
+            window.projectiles.forEach(projectile => {
+                if (projectile && window.scene) {
+                    window.scene.remove(projectile);
+                }
+            });
+        }
         window.projectiles = [];
         
         // Reset active enemy
@@ -2817,6 +2822,7 @@ function restartGame() {
         window.gameState.playerHealth = window.config.playerHealth;
         window.gameState.damageTaken = 0;
         window.gameState.missedIntervals = {};
+        window.gameState.missedProjectiles = 0;
         window.gameState.backgroundMusicPlaying = false;
         window.gameState.canMove = false; // Reset movement restriction flag
         
@@ -2845,10 +2851,9 @@ function restartGame() {
         // Fix z-index layering to ensure canvas is visible
         fixZIndexLayers();
         
-        // Ensure audio context is in running state one more time before continuing
-        if (window.audioContext && window.audioContext.state === 'suspended') {
-            window.audioContext.resume();
-        }
+        // Reset game clock
+        window.gameState.startTime = null; // Will be set when countdown finishes
+        window.gameState.completionTime = 0;
         
         // Make sure to recreate the maze and walls
         createMaze();
@@ -2875,6 +2880,17 @@ function restartGame() {
         
         // Reset movement flag to prevent movement before countdown completes
         window.gameState.canMove = false;
+        
+        // Reset velocity to prevent leftover momentum
+        if (window.velocity) {
+            window.velocity.set(0, 0, 0);
+        }
+        
+        // Reset movement keys
+        window.moveForward = false;
+        window.moveBackward = false;
+        window.moveLeft = false;
+        window.moveRight = false;
         
         // Start the countdown timer - timer will be initialized in the countdown function
         startCountdown();
