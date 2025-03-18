@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interval Hunter - 3D Ear Training Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0b0b2a; }
+        canvas { display: block; }
+        #ui-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            font-family: 'Arial', sans-serif;
+        }
+        .interval-option {
+            position: fixed;
+            background: rgba(10,10,40,0.95);
+            color: white;
+            padding: 25px 40px;
+            border-radius: 10px;
+            font-size: 42px;
+            font-weight: bold;
+            display: none;
+            border: 5px solid;
+            text-shadow: 0 0 15px;
+            z-index: 9999;
+            pointer-events: auto;
+            box-shadow: 0 0 35px;
+        }
+        #left-option { 
+            top: 50%;
+            left: 25%;
+            transform: translate(-50%, -50%);
+            border-color: #00ffff;
+            box-shadow: 0 0 35px #00ffff;
+            text-shadow: 0 0 15px #00ffff;
+        }
+        #right-option { 
+            top: 50%;
+            right: 25%;
+            transform: translate(50%, -50%);
+            border-color: #ff00ff;
+            box-shadow: 0 0 35px #ff00ff;
+            text-shadow: 0 0 15px #ff00ff;
+        }
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10,10,40,0.9);
+            color: #00ffff;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+            pointer-events: auto;
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 20px rgba(255,0,255,0.5);
+            z-index: 20; /* Ensure instructions is above crosshair */
+        }
+        #instructions h1 {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+        }
+        #countdown-timer {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff00ff;
+            font-size: 120px;
+            font-weight: bold;
+            text-shadow: 0 0 30px #00ffff;
+            z-index: 10000;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        #countdown-timer.show {
+            opacity: 1;
+        }
+        #countdown-timer .go {
+            color: #00ffff;
+            font-size: 150px;
+            text-shadow: 0 0 30px #ff00ff;
+        }
+        #pause-menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10,10,40,0.95);
+            color: #00ffff;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px;
+            pointer-events: auto;
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 30px rgba(255,0,255,0.7);
+            z-index: 10000; /* Ensure it's above everything else */
+            min-width: 300px;
+        }
+        #pause-menu h1 {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+            margin-bottom: 20px;
+        }
+        #start-button {
+            background: linear-gradient(to right, #ff00ff, #00ffff);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 5px;
+            pointer-events: auto;
+            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+        }
+        #loading-message {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00ffff;
+            background: rgba(10,10,40,0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid #ff00ff;
+        }
+        .game-button {
+            background: linear-gradient(to right, #ff00ff, #00ffff);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 16px;
+            margin: 10px 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            pointer-events: auto;
+            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-container">
+        <div id="left-option" class="interval-option">
+            <span style="display:block;font-size:18px;opacity:0.9;margin-bottom:10px">LEFT CLICK</span>
+            Interval
+        </div>
+        <div id="right-option" class="interval-option">
+            <span style="display:block;font-size:18px;opacity:0.9;margin-bottom:10px">RIGHT CLICK</span>
+            Interval
+        </div>
+        <div id="instructions">
+            <h1>Inter(Val) Hunter</h1>
+            <p>Listen to the intervals played by enemies and shoot the correct option.</p>
+            <p>Use WASD to move, mouse to look around.</p>
+            <p>Left click to select left option, right click to select right option.</p>
+            <button id="start-button">Start Game</button>
+        </div>
+        <div id="loading-message">Loading game...</div>
+        
+        <!-- Pause Menu -->
+        <div id="pause-menu" style="display: none;">
+            <h1>Game Paused</h1>
+            <div class="button-container">
+                <button id="pause-continue-button" class="game-button">Continue</button>
+                <button id="pause-main-menu-button" class="game-button">Main Menu</button>
+            </div>
+        </div>
+        
+        <!-- Countdown Timer -->
+        <div id="countdown-timer"></div>
+    </div>
+    
+    <!-- Load Three.js directly from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js"></script>
+    
+    <!-- Add a fallback checker -->
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof THREE === 'undefined' || typeof THREE.PointerLockControls === 'undefined') {
+                console.error("Required libraries not loaded properly.");
+                document.getElementById('loading-message').textContent = 
+                    "Error: Three.js libraries not loaded. Please check your internet connection and try again.";
+                document.getElementById('loading-message').style.color = "red";
+            }
+        });
+    </script>
+    
+    <!-- Load your game script after DOM is ready -->
+    <script>
+        // Show loading message
+        const loadingMessage = document.getElementById('loading-message');
+        
+        // Wait for DOM to be fully loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            loadingMessage.textContent = "DOM loaded, loading game script...";
+            
+            // Create script element for game.js
+            const gameScript = document.createElement('script');
+            gameScript.src = 'game.js?v=' + Date.now();
+            gameScript.type = 'text/javascript';
+            
+            // Handle errors loading game.js
+            gameScript.onerror = () => {
+                loadingMessage.textContent = "Error loading game script!";
+                loadingMessage.style.color = "red";
+            };
+            
+            // Handle successful load
+            gameScript.onload = () => {
+                loadingMessage.textContent = "Game script loaded, initializing...";
+                
+                // Make sure all game initialization happens after DOM is fully loaded
+                if (typeof initGame === 'function') {
+                    // Small delay to ensure everything is ready
+                    setTimeout(() => {
+                        try {
+                            initGame();
+                            loadingMessage.textContent = "Game initialized successfully!";
+                            setTimeout(() => {
+                                loadingMessage.style.opacity = "0";
+                                setTimeout(() => loadingMessage.style.display = "none", 1000);
+                            }, 2000);
+                        } catch (error) {
+                            loadingMessage.textContent = "Game initialization failed: " + error.message;
+                            loadingMessage.style.color = "red";
+                            console.error("Game initialization error:", error);
+                        }
+                    }, 100);
+                } else {
+                    loadingMessage.textContent = "Error: Game initialization function not found!";
+                    loadingMessage.style.color = "red";
+                }
+            };
+            
+            // Add script to document
+            document.body.appendChild(gameScript);
+            loadingMessage.textContent = "Game script requested...";
+        });
+    </script>
+</body>
+</html>
