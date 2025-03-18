@@ -6,6 +6,44 @@ window.addEventListener('load', () => {
     initGame();
 });
 
+// Helper functions for loading animation
+function showLoadingAnimation() {
+    try {
+        const loadingContainer = document.getElementById('loading-container');
+        if (!loadingContainer) {
+            console.error("Loading container not found");
+            return;
+        }
+        
+        // Set display to flex for proper centering
+        loadingContainer.style.display = 'flex';
+        
+        // Force a reflow to ensure the animation displays immediately
+        loadingContainer.offsetHeight;
+        
+        console.log("Loading animation shown successfully");
+    } catch (error) {
+        console.error("Error showing loading animation:", error);
+    }
+}
+
+function hideLoadingAnimation() {
+    try {
+        const loadingContainer = document.getElementById('loading-container');
+        if (!loadingContainer) {
+            console.error("Loading container not found");
+            return;
+        }
+        
+        // Hide the container
+        loadingContainer.style.display = 'none';
+        
+        console.log("Loading animation hidden successfully");
+    } catch (error) {
+        console.error("Error hiding loading animation:", error);
+    }
+}
+
 // Main initialization function
 function initGame() {
     try {
@@ -53,6 +91,9 @@ function initGame() {
     } catch (error) {
         console.error("Game initialization failed:", error);
         alert("Game initialization failed: " + error.message);
+        
+        // Hide loading animation if there was an error
+        hideLoadingAnimation();
     }
 }
 
@@ -611,7 +652,24 @@ function initUI() {
     // Set up start button
     const startButton = document.getElementById('start-button');
     if (startButton) {
-        startButton.addEventListener('click', startGame);
+        // Remove any existing event listeners by creating a new button
+        const newStartButton = startButton.cloneNode(true);
+        startButton.parentNode.replaceChild(newStartButton, startButton);
+        
+        // Add event listener for start button with immediate loading animation
+        newStartButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            console.log("Start button clicked from main menu");
+            
+            // Show loading animation using our new function
+            showLoadingAnimation();
+            
+            // Small delay before starting the game to ensure animation is visible
+            setTimeout(() => {
+                // Start the game
+                startGame();
+            }, 50);
+        });
     } else {
         console.error("Start button not found");
     }
@@ -652,10 +710,83 @@ function initUI() {
         // Add fresh event listener
         newMainMenuButton.addEventListener('click', function(event) {
             event.preventDefault();
-            console.log("Main menu button clicked");
+            console.log("Main menu button clicked from pause menu");
+            
+            // Show loading animation immediately
+            showLoadingAnimation();
+            
             togglePauseMenu(); // Close pause menu
             returnToMainMenu(); // Return to main menu
         });
+    }
+}
+
+// Function to play a beep sound for countdown
+function playCountdownBeep(isGo = false) {
+    if (!window.audioContext) return;
+    
+    try {
+        // Create oscillator and gain node
+        const oscillator = window.audioContext.createOscillator();
+        const gainNode = window.audioContext.createGain();
+        
+        // Connect the nodes
+        oscillator.connect(gainNode);
+        gainNode.connect(window.audioContext.destination);
+        
+        // Configure sound (different for numbers vs GO)
+        if (isGo) {
+            // Higher pitched, brighter sound for GO
+            oscillator.type = 'square';
+            oscillator.frequency.value = 880; // A5 - higher pitch for GO
+            gainNode.gain.value = 0.15;
+            
+            // Start with attack
+            oscillator.start();
+            
+            // Add a slight pitch bend up for excitement
+            oscillator.frequency.exponentialRampToValueAtTime(1200, window.audioContext.currentTime + 0.2);
+            
+            // Envelope - longer for GO
+            gainNode.gain.setValueAtTime(0.15, window.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, window.audioContext.currentTime + 0.5);
+            
+            // Stop after effect is done
+            setTimeout(() => {
+                try {
+                    oscillator.stop();
+                    oscillator.disconnect();
+                    gainNode.disconnect();
+                } catch (e) {
+                    // Ignore errors if already stopped
+                }
+            }, 500);
+        } else {
+            // Regular countdown beep (3, 2, 1)
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 440; // A4
+            gainNode.gain.value = 0.1;
+            
+            // Start oscillator
+            oscillator.start();
+            
+            // Envelope
+            gainNode.gain.setValueAtTime(0.1, window.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, window.audioContext.currentTime + 0.2);
+            
+            // Stop after effect is done
+            setTimeout(() => {
+                try {
+                    oscillator.stop();
+                    oscillator.disconnect();
+                    gainNode.disconnect();
+                } catch (e) {
+                    // Ignore errors if already stopped
+                }
+            }, 200);
+        }
+    } catch (error) {
+        console.error("Error playing countdown beep:", error);
     }
 }
 
@@ -664,33 +795,42 @@ function startCountdown() {
     const countdownEl = document.getElementById('countdown-timer');
     if (!countdownEl) return;
     
+    // Hide loading animation now that we're starting the countdown
+    hideLoadingAnimation();
+    
     // Ensure player can't move during countdown
     window.gameState.canMove = false;
     
     // Make countdown element visible
     countdownEl.classList.add('show');
     
-    // Start with 3
+    // Start with 3 and play first beep
     countdownEl.textContent = '3';
+    playCountdownBeep();
     
-    // After 1 second, show 2
+    // After 1 second, show 2 and play beep
     setTimeout(() => {
         countdownEl.textContent = '2';
+        playCountdownBeep();
         
-        // After another second, show 1
+        // After another second, show 1 and play beep
         setTimeout(() => {
             countdownEl.textContent = '1';
+            playCountdownBeep();
             
-            // After another second, show GO!
+            // After another second, show GO! without beep sound
             setTimeout(() => {
                 countdownEl.innerHTML = '<span class="go">GO!</span>';
+                // Removed: playCountdownBeep(true); - No special GO sound, just music
                 
                 // Enable player movement
                 window.gameState.canMove = true;
                 
                 // Initialize game timer only when GO appears
-                // This ensures the countdown time isn't counted against the player
                 initializeGameTimer();
+                
+                // Start background music exactly on GO
+                playBackgroundMusic();
                 
                 // After a short delay, hide the countdown
                 setTimeout(() => {
@@ -707,6 +847,9 @@ function startGame() {
     console.log("Starting game");
     
     try {
+        // Ensure loading animation is visible
+        showLoadingAnimation();
+        
         // Make sure pause menu is hidden first
         const pauseMenu = document.getElementById('pause-menu');
         if (pauseMenu) {
@@ -723,41 +866,25 @@ function startGame() {
             canvas.style.zIndex = '1';
             
             // Make sure it's the first child
-            const parent = canvas.parentElement;
-            if (parent && parent.firstChild !== canvas) {
+            const parent = canvas.parentNode;
+            if (parent.firstChild !== canvas) {
                 parent.insertBefore(canvas, parent.firstChild);
             }
         } else {
-            console.error("Canvas not found - game rendering will not work");
+            console.error("Canvas element not found");
         }
         
-        // Make sure UI container is above canvas
-        const uiContainer = document.getElementById('ui-container');
-        if (uiContainer) {
-            uiContainer.style.zIndex = '10';
-        }
-        
-        // Set game as started first to ensure the animation loop updates
-        window.gameState.started = true;
-        window.gameState.gameOver = false;
-        window.gameState.gameWon = false;
-        window.gameState.paused = false; // Explicitly set paused to false
-        
-        // Clear any existing timers or intervals first
-        if (window.gameTimerInterval) {
-            clearInterval(window.gameTimerInterval);
-            window.gameTimerInterval = null;
-        }
-        
-        // Hide the instructions panel
+        // Hide instruction panel
         const instructions = document.getElementById('instructions');
         if (instructions) {
-            console.log("Hiding instructions panel");
             instructions.style.display = 'none';
         }
         
-        // Clear any existing game elements first
-        console.log("Clearing existing game elements");
+        // Set game as started in gameState - although actual gameplay starts after countdown
+        window.gameState.started = true;
+        window.gameState.gameOver = false;
+        window.gameState.gameWon = false;
+        
         clearGameElements();
         
         // Ensure audio context is ready
@@ -818,13 +945,11 @@ function startGame() {
         // Reset movement flag to prevent movement before countdown completes
         window.gameState.canMove = false;
         
+        // Hide loading animation before starting countdown
+        hideLoadingAnimation();
+        
         // Start the countdown timer
         startCountdown();
-        
-        // Start background music with a slight delay to ensure proper initialization
-        setTimeout(() => {
-            playBackgroundMusic();
-        }, 300);
         
         // Make sure z-index layering is correct
         fixZIndexLayers();
@@ -843,6 +968,9 @@ function startGame() {
     } catch (error) {
         console.error("Error starting game:", error);
         alert("Failed to start game: " + error.message);
+        
+        // Hide loading animation if there was an error
+        hideLoadingAnimation();
     }
 }
 
@@ -1556,9 +1684,15 @@ function playExplosionSound() {
         // Envelope
         gain.gain.exponentialRampToValueAtTime(0.001, window.audioContext.currentTime + 0.6);
         
-        // Stop after effect is done
+        // Stop after effect is done and clean up resources
         setTimeout(() => {
-            osc.stop();
+            try {
+                osc.stop();
+                osc.disconnect();
+                gain.disconnect();
+            } catch (e) {
+                // Ignore errors if already stopped/disconnected
+            }
         }, 600);
     } catch (error) {
         console.error("Error playing explosion sound:", error);
@@ -2449,11 +2583,16 @@ function handleGameOver() {
     if (tryAgainButton) {
         tryAgainButton.addEventListener('click', function() {
             console.log("Try again button clicked");
+            
+            // Show loading animation immediately
+            showLoadingAnimation();
+            
             // First remove the game over message
             const gameOverMsg = document.getElementById('game-over-message');
             if (gameOverMsg) {
                 gameOverMsg.remove();
             }
+            
             // Call restartGame with a short delay to ensure cleanup
             setTimeout(() => {
                 restartGame();
@@ -2466,7 +2605,11 @@ function handleGameOver() {
     const mainMenuButton = document.getElementById('main-menu-button');
     if (mainMenuButton) {
         mainMenuButton.addEventListener('click', function() {
-            console.log("Main menu button clicked");
+            console.log("Main menu button clicked from game over screen");
+            
+            // Show loading animation immediately
+            showLoadingAnimation();
+            
             // First remove the game over message
             const gameOverMsg = document.getElementById('game-over-message');
             if (gameOverMsg) {
@@ -2475,156 +2618,6 @@ function handleGameOver() {
             
             // Ensure we're setting the game as not started BEFORE calling returnToMainMenu
             window.gameState.started = false;
-            window.gameState.gameOver = false;
-            
-            // Return to main menu
-            returnToMainMenu();
-            
-            // Double-check that the instructions are visible
-            const instructions = document.getElementById('instructions');
-            if (instructions) {
-                console.log("Making sure instructions panel is visible");
-                instructions.style.display = 'block';
-            }
-            
-            // Ensure controls are unlocked
-            if (window.controls) {
-                window.controls.unlock();
-            }
-        });
-    } else {
-        console.error("Could not find main menu button");
-    }
-    
-    // Release pointer lock
-    if (window.controls && window.controls.isLocked) {
-        console.log("Releasing pointer lock for game over");
-        window.controls.unlock();
-    }
-    
-    // Fade out background music
-    fadeOutBackgroundMusic();
-}
-
-// Handle reaching the goal
-function handleGoalReached() {
-    console.log("Goal reached");
-    
-    window.gameState.gameWon = true;
-    window.gameState.gameOver = true;
-    
-    // Calculate final score
-    window.gameState.completionTime = (Date.now() - window.gameState.startTime) / 1000; // Convert to seconds
-    
-    // Calculate the final score components
-    const baseScore = window.gameState.score;
-    const timePenalty = Math.floor(window.gameState.completionTime * 10);
-    const healthPercentage = window.gameState.playerHealth / window.config.playerHealth;
-    const healthBonus = Math.floor(5000 * healthPercentage);
-    const damagePenalty = window.gameState.damageTaken * 50;
-    const missedProjectilesPenalty = (window.gameState.missedProjectiles || 0) * 100;
-    const finalScore = calculateFinalScore();
-    
-    // Create missed intervals HTML
-    let missedIntervalsHTML = '';
-    if (window.gameState.missedIntervals && Object.keys(window.gameState.missedIntervals).length > 0) {
-        missedIntervalsHTML = `
-            <div style="text-align: left; margin-top: 15px; margin-bottom: 15px; font-size: 14px; border: 1px solid rgba(0,255,255,0.5); padding: 10px; border-radius: 5px;">
-                <div style="color: #00ffaa; font-weight: bold; margin-bottom: 5px;">Intervals to Practice:</div>
-        `;
-        
-        for (const interval in window.gameState.missedIntervals) {
-            const count = window.gameState.missedIntervals[interval];
-            // Format interval name and direction
-            const formattedInterval = interval.replace(/([A-Za-z0-9 ]+) (↑|↓)/, '<span style="color: #00ffaa;">$1</span> <span style="font-size: 18px;">$2</span>');
-            missedIntervalsHTML += `<div>${formattedInterval}: ${count} time${count > 1 ? 's' : ''}</div>`;
-        }
-        
-        missedIntervalsHTML += '</div>';
-    } else {
-        missedIntervalsHTML = '<div style="margin: 15px 0; color: #00ffaa;">Perfect interval recognition! No mistakes made.</div>';
-    }
-    
-    // Add missed projectiles information
-    const missedProjectilesHTML = window.gameState.missedProjectiles > 0 ? 
-        `<div style="margin: 15px 0; color: #00ffaa;">Missed Projectiles: ${window.gameState.missedProjectiles}</div>` : 
-        '<div style="margin: 15px 0; color: #00ffaa;">Perfect aim! No projectiles missed.</div>';
-    
-    // Create victory message
-    const victoryMsg = document.createElement('div');
-    victoryMsg.id = 'victory-message';
-    victoryMsg.style.cssText = `
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0,0,0,0.8);
-        color: #00ffff;
-        padding: 30px;
-        border-radius: 10px;
-        text-align: center;
-        font-family: Arial, sans-serif;
-        border: 2px solid #00ffff;
-        box-shadow: 0 0 20px #00ffff;
-        z-index: 1000;
-        min-width: 300px;
-    `;
-    
-    // Set content
-    victoryMsg.innerHTML = `
-        <h1 style="color: #00ffff; text-shadow: 0 0 10px #00ffff; margin-bottom: 15px;">Level Complete!</h1>
-        <div style="font-size: 18px; margin-bottom: 20px;">You reached the goal!</div>
-        <div style="text-align: left; margin: 20px 0; border: 1px solid rgba(255,255,255,0.2); padding: 15px; border-radius: 5px;">
-            <div><span style="color: #cccccc;">Base Score:</span> <span style="float: right;">${baseScore}</span></div>
-            <div><span style="color: #cccccc;">Time:</span> <span style="float: right;">${window.gameState.completionTime.toFixed(1)}s</span></div>
-            <div><span style="color: #cccccc;">Time Penalty:</span> <span style="float: right; color: #ff7777;">-${timePenalty}</span></div>
-            <div><span style="color: #cccccc;">Health Bonus:</span> <span style="float: right; color: #77ff77;">+${healthBonus}</span></div>
-            <div><span style="color: #cccccc;">Damage Penalty:</span> <span style="float: right; color: #ff7777;">-${damagePenalty}</span></div>
-            <div><span style="color: #cccccc;">Missed Projectiles Penalty:</span> <span style="float: right; color: #ff7777;">-${missedProjectilesPenalty}</span></div>
-            <div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 10px; padding-top: 10px;"><span style="color: white; font-weight: bold;">Final Score:</span> <span style="float: right; font-weight: bold; color: #ffff77;">${finalScore}</span></div>
-        </div>
-        ${missedIntervalsHTML}
-        ${missedProjectilesHTML}
-        <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
-            <button id="play-again-button" style="background: linear-gradient(to right, #00ffff, #ff00ff); border: none; color: white; padding: 10px 20px; cursor: pointer; border-radius: 5px; text-shadow: 0 0 5px rgba(255,255,255,0.5); box-shadow: 0 0 10px rgba(0,255,255,0.5);">Play Again</button>
-            <button id="victory-main-menu-button" style="background: rgba(30,30,60,0.8); border: 1px solid #ff00ff; color: #ff00ff; padding: 10px 20px; cursor: pointer; border-radius: 5px; text-shadow: 0 0 5px rgba(255,0,255,0.5);">Main Menu</button>
-        </div>
-    `;
-    
-    document.body.appendChild(victoryMsg);
-    
-    // Add event listeners to buttons
-    const playAgainButton = document.getElementById('play-again-button');
-    if (playAgainButton) {
-        playAgainButton.addEventListener('click', function() {
-            console.log("Play again button clicked");
-            // First remove the victory message
-            const victoryMsg = document.getElementById('victory-message');
-            if (victoryMsg) {
-                victoryMsg.remove();
-            }
-            // Call restartGame with a short delay to ensure cleanup
-            setTimeout(() => {
-                restartGame();
-            }, 100);
-        });
-    } else {
-        console.error("Could not find play again button");
-    }
-    
-    const mainMenuButton = document.getElementById('victory-main-menu-button');
-    if (mainMenuButton) {
-        mainMenuButton.addEventListener('click', function() {
-            console.log("Main menu button clicked");
-            // First remove the victory message
-            const victoryMsg = document.getElementById('victory-message');
-            if (victoryMsg) {
-                victoryMsg.remove();
-            }
-            
-            // Ensure we're setting the game as not started BEFORE calling returnToMainMenu
-            window.gameState.started = false;
-            window.gameState.gameWon = false;
             window.gameState.gameOver = false;
             
             // Return to main menu
@@ -2724,6 +2717,9 @@ function restartGame() {
     console.log("Restarting game");
     
     try {
+        // Show loading animation
+        showLoadingAnimation();
+        
         // Ensure we're not in a game over state
         window.gameState.gameOver = false;
         window.gameState.gameWon = false;
@@ -2812,10 +2808,10 @@ function restartGame() {
             gameOverMessage.remove();
         }
         
-        // Explicitly reset all game state flags
+        // Reset game state variables
         window.gameState.gameOver = false;
         window.gameState.gameWon = false;
-        window.gameState.started = true;  // This is critical!
+        window.gameState.started = true;
         window.gameState.paused = false;
         window.gameState.score = 0;
         window.gameState.enemiesDefeated = 0;
@@ -2892,6 +2888,9 @@ function restartGame() {
         window.moveLeft = false;
         window.moveRight = false;
         
+        // Hide loading animation before starting countdown
+        hideLoadingAnimation();
+        
         // Start the countdown timer - timer will be initialized in the countdown function
         startCountdown();
         
@@ -2907,19 +2906,15 @@ function restartGame() {
             console.error("Error locking controls:", e);
         }
         
-        // Start background music with a slight delay to ensure proper setup
-        setTimeout(() => {
-            try {
-                playBackgroundMusic();
-            } catch (e) {
-                console.error("Error playing background music:", e);
-            }
-        }, 500); // Slightly longer delay to ensure everything is ready
+        // Remove background music start with delay since it's now started in the countdown
         
         console.log("Game restarted successfully");
     } catch (error) {
         console.error("Error restarting game:", error);
         alert("There was an error restarting the game. Please refresh the page.");
+        
+        // Hide loading animation if there was an error
+        hideLoadingAnimation();
     }
 }
 
@@ -3165,14 +3160,14 @@ function initThreeJS() {
         window.scene = new THREE.Scene();
         
         // Add fog for atmosphere but with increased visibility range
-        window.scene.fog = new THREE.Fog(0x000033, 20, 70); // Increased visibility range
+        window.scene.fog = new THREE.Fog(0x000033, 20, 500); // Increased visibility range
         
         // Create camera
         window.camera = new THREE.PerspectiveCamera(
             75, // Field of view
             window.innerWidth / window.innerHeight, // Aspect ratio
             0.1, // Near clipping plane
-            1000 // Far clipping plane
+            6000 // Far clipping plane - increased to see distant sky
         );
         window.camera.position.y = 1.6; // Average eye height
         
@@ -3221,13 +3216,16 @@ function initThreeJS() {
 
 // Create synthwave style sky - simplified for better performance
 function createSynthwaveSky() {
-    console.log("Creating simplified synthwave sky");
+    console.log("Creating minimalist synthwave sky");
     
-    // Simple gradient background with fog
-    window.renderer.setClearColor(new THREE.Color(0x0a005a)); // Deep purple base color
-    window.scene.fog = new THREE.FogExp2(0x110038, 0.0025); // Fog for atmosphere
+    // Set a darker base color for the scene
+    window.renderer.setClearColor(new THREE.Color(0x050023)); // Deep purple-blue base color
+    window.scene.fog = new THREE.FogExp2(0x110038, 0.0015); // Reduced fog density for better visibility
     
-    // Single ground plane with simpler grid
+    // Create a single backdrop for the sky instead of a box
+    createSimpleSkyBackdrop();
+    
+    // Ground plane with grid
     const groundSize = 2000;
     const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize);
     const groundMaterial = new THREE.MeshBasicMaterial({
@@ -3237,28 +3235,199 @@ function createSynthwaveSky() {
     
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -20;
+    ground.position.y = -0.5;
     window.scene.add(ground);
     
-    // Single grid - simpler than before
-    const gridHelper = new THREE.GridHelper(groundSize, 50, 0xff00ff, 0x00ffff);
-    gridHelper.position.y = -19.9;
+    // Create enhanced grid with perspective effect
+    const gridHelper = new THREE.GridHelper(groundSize, 100, 0xff00ff, 0x00ffff);
+    gridHelper.position.y = -0.48; // Slightly above ground
     window.scene.add(gridHelper);
     
-    // Simple static sun (no animation needed)
-    const sunGeometry = new THREE.CircleGeometry(200, 32);
-    const sunMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff5500,
-        transparent: true,
-        opacity: 0.8
+    console.log("Minimalist synthwave sky created");
+}
+
+// Create a simple backdrop with gradient and sun
+function createSimpleSkyBackdrop() {
+    // Create a smaller, more visible sky sphere
+    const skyGeometry = new THREE.SphereGeometry(1000, 32, 16);
+    
+    // Create a canvas for the sky texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 2048;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+    
+    // Create vibrant synthwave sunset gradient with higher contrast
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bgGradient.addColorStop(0, '#090425'); // Deep purple-blue at top
+    bgGradient.addColorStop(0.2, '#170245'); // Rich purple
+    bgGradient.addColorStop(0.4, '#3b0069'); // Medium purple
+    bgGradient.addColorStop(0.6, '#5d0066'); // Fuchsia
+    bgGradient.addColorStop(0.7, '#840048'); // Deep pink
+    bgGradient.addColorStop(0.8, '#ff1c51'); // Bright pink
+    bgGradient.addColorStop(0.9, '#ff6c20'); // Bright orange 
+    bgGradient.addColorStop(1, '#ffb200'); // Golden yellow at bottom
+    
+    // Fill background
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Add stars in darker areas
+    for (let i = 0; i < 350; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * (canvas.height * 0.6); // Stars in top 60%
+        const size = Math.random() * 1.5 + 0.5;
+        
+        // Vary star brightness
+        const brightness = Math.random() * 80 + 175; // 175-255
+        ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+        ctx.globalAlpha = Math.random() * 0.7 + 0.3;
+        ctx.fillRect(x, y, size, size);
+    }
+    
+    // Draw sun and grid directly on the sky texture
+    drawSunAndGridOnSky(ctx, canvas.width, canvas.height);
+    
+    // Reset alpha
+    ctx.globalAlpha = 1.0;
+    
+    // Create texture from canvas 
+    const skyTexture = new THREE.CanvasTexture(canvas);
+    
+    // Create sky material
+    const skyMaterial = new THREE.MeshBasicMaterial({
+        map: skyTexture,
+        side: THREE.BackSide, // Show from inside
+        fog: false, // Don't apply fog to the sky
+        depthWrite: false // Ensure it's always visible
     });
     
-    const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-    sun.position.set(0, 200, -1000);
-    sun.lookAt(0, 200, 0);
-    window.scene.add(sun);
+    // Create sky sphere
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    window.scene.add(sky);
     
-    console.log("Simplified synthwave sky created");
+    console.log("Sky created with size:", skyGeometry.parameters.radius);
+    
+    // Force a render to ensure everything is visible
+    if (window.renderer && window.scene && window.camera) {
+        window.renderer.render(window.scene, window.camera);
+    }
+}
+
+// Draw sun and grid directly on the sky texture
+function drawSunAndGridOnSky(ctx, width, height) {
+    // Draw the horizon line
+    const horizonY = height * 0.62; // Set horizon a bit lower (62% down)
+    
+    // Set the sun Y position slightly higher than the horizon
+    const sunY = horizonY - 40; // 40 pixels above horizon
+    const centerX = width / 2;
+    
+    // Draw sun glow first (behind the solid sun)
+    const sunGlowGradient = ctx.createRadialGradient(
+        centerX, sunY, 0,
+        centerX, sunY, 400
+    );
+    sunGlowGradient.addColorStop(0, 'rgba(255, 155, 50, 0.9)');
+    sunGlowGradient.addColorStop(0.4, 'rgba(255, 100, 30, 0.5)');
+    sunGlowGradient.addColorStop(0.7, 'rgba(255, 50, 30, 0.2)');
+    sunGlowGradient.addColorStop(1, 'rgba(255, 0, 50, 0)');
+    
+    ctx.fillStyle = sunGlowGradient;
+    ctx.beginPath();
+    ctx.arc(centerX, sunY, 400, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw solid sun with no transparency
+    const sunSize = 150;
+    ctx.beginPath();
+    ctx.arc(centerX, sunY, sunSize, 0, Math.PI * 2);
+    
+    // Create a vibrant sun gradient with solid colors (no transparency)
+    const sunGradient = ctx.createLinearGradient(centerX - sunSize, sunY, centerX + sunSize, sunY);
+    sunGradient.addColorStop(0, '#ff5500');  // Orange at left edge
+    sunGradient.addColorStop(0.25, '#ff8800'); // Light orange
+    sunGradient.addColorStop(0.5, '#ffdd00');  // Bright yellow in center
+    sunGradient.addColorStop(0.75, '#ff8800'); // Light orange
+    sunGradient.addColorStop(1, '#ff5500');  // Orange at right edge
+    
+    // Fill the sun with the solid gradient
+    ctx.fillStyle = sunGradient;
+    ctx.globalAlpha = 1.0; // Ensure full opacity
+    ctx.fill();
+    
+    // Add a solid highlight in the center (no transparency)
+    ctx.beginPath();
+    ctx.arc(centerX, sunY, sunSize * 0.5, 0, Math.PI * 2);
+    
+    // Create a solid highlight gradient
+    const highlightGradient = ctx.createRadialGradient(
+        centerX, sunY, 0,
+        centerX, sunY, sunSize * 0.5
+    );
+    highlightGradient.addColorStop(0, '#ffffcc'); // Solid light yellow center
+    highlightGradient.addColorStop(1, '#ffdd00'); // Fade to match the sun's center color
+    
+    ctx.fillStyle = highlightGradient;
+    ctx.globalAlpha = 0.7; // Still mostly opaque but slightly blended
+    ctx.fill();
+    
+    // Reset alpha for the rest of the drawing
+    ctx.globalAlpha = 1.0;
+    
+    // Draw the horizon line (after sun so it's visible)
+    ctx.strokeStyle = '#00ffff'; // Bright cyan for horizon
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, horizonY);
+    ctx.lineTo(width, horizonY);
+    ctx.stroke();
+    
+    // Add grid lines below horizon
+    // Horizontal lines (cyan)
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 2;
+    
+    // Add horizontal lines with increasing spacing
+    for (let i = 1; i <= 40; i++) {
+        const spacing = 8 + i * 1.5; // Closer spacing
+        const y = horizonY + i * spacing;
+        
+        if (y >= height) continue;
+        
+        // Reduce opacity with distance
+        ctx.globalAlpha = 1 - (i / 40) * 0.8;
+        
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+    
+    // Vertical lines (magenta)
+    ctx.strokeStyle = '#ff00ff';
+    ctx.lineWidth = 2;
+    const vertLineCount = 40;
+    
+    for (let i = -vertLineCount; i <= vertLineCount; i++) {
+        // Skip the center line
+        if (i === 0) continue;
+        
+        // Calculate x position with wider spacing further from center
+        const x = centerX + (i * (width / (vertLineCount * 2.5)) * (Math.abs(i) * 0.08 + 1));
+        
+        // Reduce opacity for lines further from center
+        const normalizedDist = Math.abs(i) / vertLineCount;
+        ctx.globalAlpha = 1 - normalizedDist * 0.75;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, horizonY);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+    }
+    
+    // Reset alpha
+    ctx.globalAlpha = 1.0;
 }
 
 // Create or recreate interval options UI elements
@@ -3426,30 +3595,83 @@ function playSuccessSound() {
     if (!window.audioContext) return;
     
     try {
-        const osc1 = window.audioContext.createOscillator();
-        const osc2 = window.audioContext.createOscillator();
-        const gain = window.audioContext.createGain();
+        // Create audio nodes
+        const gainNode = window.audioContext.createGain();
         
-        osc1.type = 'triangle';
-        osc1.frequency.value = 440;
-        osc1.connect(gain);
+        // Create a noise source for non-tonal sound that contrasts with interval sounds
+        const bufferSize = window.audioContext.sampleRate * 0.4; // 0.4 second buffer
+        const noiseBuffer = window.audioContext.createBuffer(1, bufferSize, window.audioContext.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
         
-        osc2.type = 'sine';
-        osc2.frequency.value = 880;
-        osc2.connect(gain);
+        // Fill with noise but shape it for an explosive character
+        for (let i = 0; i < bufferSize; i++) {
+            // Create a decay curve for the noise amplitude
+            const decay = 1.0 - (i / bufferSize);
+            // Sharper attack at the beginning
+            const envelope = i < 2000 ? Math.min(1.0, i / 2000) * decay * decay : decay * decay;
+            // Add randomness but with some spectral shaping
+            output[i] = (Math.random() * 2 - 1) * envelope;
+        }
         
-        gain.connect(window.audioContext.destination);
-        gain.gain.value = 0.2;
+        // Create noise source
+        const noiseSource = window.audioContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
         
-        osc1.start();
-        osc2.start();
-        osc1.frequency.linearRampToValueAtTime(880, window.audioContext.currentTime + 0.2);
-        osc2.frequency.linearRampToValueAtTime(1760, window.audioContext.currentTime + 0.2);
+        // Create a bandpass filter to shape the noise into a "whoosh" sound
+        const bandpass = window.audioContext.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.value = 1600; // Mid-high frequency focus
+        bandpass.Q.value = 0.8; // Wider bandwidth
         
+        // Create a highpass filter to remove low rumble
+        const highpass = window.audioContext.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 600;
+        
+        // Create a small reverb-like effect for a more "explosive" character
+        const delay = window.audioContext.createDelay(0.1);
+        delay.delayTime.value = 0.04;
+        
+        const delayGain = window.audioContext.createGain();
+        delayGain.gain.value = 0.15;
+        
+        // Connect the chain
+        noiseSource.connect(bandpass);
+        bandpass.connect(highpass);
+        
+        // Main signal path
+        highpass.connect(gainNode);
+        
+        // Delay path for reverb effect
+        highpass.connect(delay);
+        delay.connect(delayGain);
+        delayGain.connect(gainNode);
+        
+        gainNode.connect(window.audioContext.destination);
+        
+        // Set gain envelope with a sharp attack
+        const now = window.audioContext.currentTime;
+        gainNode.gain.setValueAtTime(0.01, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.6, now + 0.03); // Very sharp attack
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4); // Longer decay
+        
+        // Play the sound
+        noiseSource.start();
+        noiseSource.stop(now + 0.5);
+        
+        // Clean up resources
         setTimeout(() => {
-            osc1.stop();
-            osc2.stop();
-        }, 300);
+            try {
+                noiseSource.disconnect();
+                bandpass.disconnect();
+                highpass.disconnect();
+                delay.disconnect();
+                delayGain.disconnect();
+                gainNode.disconnect();
+            } catch (e) {
+                // Ignore errors if nodes are already disconnected
+            }
+        }, 600);
     } catch (error) {
         console.error("Error playing success sound:", error);
     }
@@ -4735,7 +4957,7 @@ function returnToMainMenu() {
         existingStatsDisplay.remove();
     }
     
-    // Clear existing maze elements
+    // Clear existing game elements
     console.log("Clearing existing game elements");
     clearGameElements();
     
@@ -4759,8 +4981,38 @@ function returnToMainMenu() {
     
     // Unlock controls for menu interaction
     if (window.controls) {
-        window.controls.unlock();
+        // Force unlock pointer controls
+        if (document.pointerLockElement || document.mozPointerLockElement || document.webkitPointerLockElement) {
+            console.log("Explicitly releasing pointer lock for main menu");
+            window.controls.unlock();
+            
+            // As a fallback, try to directly exit pointer lock through the document API
+            if (document.exitPointerLock) {
+                document.exitPointerLock();
+            } else if (document.mozExitPointerLock) {
+                document.mozExitPointerLock();
+            } else if (document.webkitExitPointerLock) {
+                document.webkitExitPointerLock();
+            }
+        }
     }
+    
+    // Double-check that pointer lock is released after a short delay
+    setTimeout(() => {
+        if (document.pointerLockElement || document.mozPointerLockElement || document.webkitPointerLockElement) {
+            console.log("Pointer still locked after delay, forcing exit again");
+            if (document.exitPointerLock) {
+                document.exitPointerLock();
+            } else if (document.mozExitPointerLock) {
+                document.mozExitPointerLock();
+            } else if (document.webkitExitPointerLock) {
+                document.webkitExitPointerLock();
+            }
+        }
+        
+        // Hide loading animation if it's visible
+        hideLoadingAnimation();
+    }, 100);
     
     console.log("Returned to main menu successfully");
 }
@@ -4993,4 +5245,163 @@ function createHitFlash(position) {
     };
     
     requestAnimationFrame(animateFlash);
+}
+
+// Handle goal reached (victory)
+function handleGoalReached() {
+    console.log("Goal reached");
+    
+    window.gameState.gameWon = true;
+    window.gameState.gameOver = true;
+    
+    // Calculate final score
+    window.gameState.completionTime = (Date.now() - window.gameState.startTime) / 1000; // Convert to seconds
+    
+    // Calculate the final score components
+    const baseScore = window.gameState.score;
+    const timePenalty = Math.floor(window.gameState.completionTime * 10);
+    const healthPercentage = window.gameState.playerHealth / window.config.playerHealth;
+    const healthBonus = Math.floor(5000 * healthPercentage);
+    const damagePenalty = window.gameState.damageTaken * 50;
+    const missedProjectilesPenalty = (window.gameState.missedProjectiles || 0) * 100;
+    const finalScore = calculateFinalScore();
+    
+    // Create missed intervals HTML
+    let missedIntervalsHTML = '';
+    if (window.gameState.missedIntervals && Object.keys(window.gameState.missedIntervals).length > 0) {
+        missedIntervalsHTML = `
+            <div style="text-align: left; margin-top: 15px; margin-bottom: 15px; font-size: 14px; border: 1px solid rgba(0,255,255,0.5); padding: 10px; border-radius: 5px;">
+                <div style="color: #00ffaa; font-weight: bold; margin-bottom: 5px;">Intervals to Practice:</div>
+        `;
+        
+        for (const interval in window.gameState.missedIntervals) {
+            const count = window.gameState.missedIntervals[interval];
+            // Format interval name and direction
+            const formattedInterval = interval.replace(/([A-Za-z0-9 ]+) (↑|↓)/, '<span style="color: #00ffaa;">$1</span> <span style="font-size: 18px;">$2</span>');
+            missedIntervalsHTML += `<div>${formattedInterval}: ${count} time${count > 1 ? 's' : ''}</div>`;
+        }
+        
+        missedIntervalsHTML += '</div>';
+    } else {
+        missedIntervalsHTML = '<div style="margin: 15px 0; color: #00ffaa;">Perfect interval recognition! No mistakes made.</div>';
+    }
+    
+    // Add missed projectiles information
+    const missedProjectilesHTML = window.gameState.missedProjectiles > 0 ? 
+        `<div style="margin: 15px 0; color: #00ffaa;">Missed Projectiles: ${window.gameState.missedProjectiles}</div>` : 
+        '<div style="margin: 15px 0; color: #00ffaa;">Perfect aim! No projectiles missed.</div>';
+    
+    // Create victory message
+    const victoryMsg = document.createElement('div');
+    victoryMsg.id = 'victory-message';
+    victoryMsg.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.8);
+        color: #00ffff;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+        font-family: Arial, sans-serif;
+        border: 2px solid #00ffff;
+        box-shadow: 0 0 20px #00ffff;
+        z-index: 1000;
+        min-width: 300px;
+    `;
+    
+    // Set content
+    victoryMsg.innerHTML = `
+        <h1 style="color: #00ffff; text-shadow: 0 0 10px #00ffff; margin-bottom: 15px;">Level Complete!</h1>
+        <div style="font-size: 18px; margin-bottom: 20px;">You reached the goal!</div>
+        <div style="text-align: left; margin: 20px 0; border: 1px solid rgba(255,255,255,0.2); padding: 15px; border-radius: 5px;">
+            <div><span style="color: #cccccc;">Base Score:</span> <span style="float: right;">${baseScore}</span></div>
+            <div><span style="color: #cccccc;">Time:</span> <span style="float: right;">${window.gameState.completionTime.toFixed(1)}s</span></div>
+            <div><span style="color: #cccccc;">Time Penalty:</span> <span style="float: right; color: #ff7777;">-${timePenalty}</span></div>
+            <div><span style="color: #cccccc;">Health Bonus:</span> <span style="float: right; color: #77ff77;">+${healthBonus}</span></div>
+            <div><span style="color: #cccccc;">Damage Penalty:</span> <span style="float: right; color: #ff7777;">-${damagePenalty}</span></div>
+            <div><span style="color: #cccccc;">Missed Projectiles Penalty:</span> <span style="float: right; color: #ff7777;">-${missedProjectilesPenalty}</span></div>
+            <div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 10px; padding-top: 10px;"><span style="color: white; font-weight: bold;">Final Score:</span> <span style="float: right; font-weight: bold; color: #ffff77;">${finalScore}</span></div>
+        </div>
+        ${missedIntervalsHTML}
+        ${missedProjectilesHTML}
+        <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+            <button id="play-again-button" style="background: linear-gradient(to right, #00ffff, #ff00ff); border: none; color: white; padding: 10px 20px; cursor: pointer; border-radius: 5px; text-shadow: 0 0 5px rgba(255,255,255,0.5); box-shadow: 0 0 10px rgba(0,255,255,0.5);">Play Again</button>
+            <button id="victory-main-menu-button" style="background: rgba(30,30,60,0.8); border: 1px solid #ff00ff; color: #ff00ff; padding: 10px 20px; cursor: pointer; border-radius: 5px; text-shadow: 0 0 5px rgba(255,0,255,0.5);">Main Menu</button>
+        </div>
+    `;
+    
+    document.body.appendChild(victoryMsg);
+    
+    // Add event listeners to buttons
+    const playAgainButton = document.getElementById('play-again-button');
+    if (playAgainButton) {
+        playAgainButton.addEventListener('click', function() {
+            console.log("Play again button clicked");
+            
+            // Show loading animation immediately
+            showLoadingAnimation();
+            
+            // First remove the victory message
+            const victoryMsg = document.getElementById('victory-message');
+            if (victoryMsg) {
+                victoryMsg.remove();
+            }
+            
+            // Call restartGame with a short delay to ensure cleanup
+            setTimeout(() => {
+                restartGame();
+            }, 100);
+        });
+    } else {
+        console.error("Could not find play again button");
+    }
+    
+    const mainMenuButton = document.getElementById('victory-main-menu-button');
+    if (mainMenuButton) {
+        mainMenuButton.addEventListener('click', function() {
+            console.log("Main menu button clicked from victory screen");
+            
+            // Show loading animation immediately
+            showLoadingAnimation();
+            
+            // First remove the victory message
+            const victoryMsg = document.getElementById('victory-message');
+            if (victoryMsg) {
+                victoryMsg.remove();
+            }
+            
+            // Ensure we're setting the game as not started BEFORE calling returnToMainMenu
+            window.gameState.started = false;
+            window.gameState.gameWon = false;
+            window.gameState.gameOver = false;
+            
+            // Return to main menu
+            returnToMainMenu();
+            
+            // Double-check that the instructions are visible
+            const instructions = document.getElementById('instructions');
+            if (instructions) {
+                console.log("Making sure instructions panel is visible");
+                instructions.style.display = 'block';
+            }
+            
+            // Ensure controls are unlocked
+            if (window.controls) {
+                window.controls.unlock();
+            }
+        });
+    } else {
+        console.error("Could not find main menu button");
+    }
+    
+    // Release pointer lock
+    if (window.controls && window.controls.isLocked) {
+        console.log("Releasing pointer lock for victory");
+        window.controls.unlock();
+    }
+    
+    // Fade out background music
+    fadeOutBackgroundMusic();
 }
