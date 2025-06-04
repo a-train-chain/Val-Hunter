@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interval Hunter - 3D Ear Training Game</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #0b0b2a;
+            /* Prevent text selection and highlighting on mobile */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        canvas { 
+            display: block;
+            /* Prevent text selection and highlighting on canvas */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+        #ui-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        /* Mobile-specific styles when body has mobile-device class */
+        body.mobile-device #instructions {
+            background: rgba(40,0,40,0.95);
+            border: 3px solid #ff00ff;
+            box-shadow: 0 0 30px rgba(255,0,255,0.8);
+            max-height: 70vh;
+            overflow-y: auto;
+            padding: 15px;
+            width: 85%;
+            max-width: 400px;
+        }
+        
+        body.mobile-device #instructions p {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        
+        body.mobile-device .main-description {
+            margin-bottom: 12px;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(0,255,255,0.3);
+            padding-bottom: 10px;
+        }
+        
+        body.mobile-device .detail-toggle {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            border-radius: 5px;
+            padding: 6px 12px;
+            margin: 5px 0 10px 0;
+            font-size: 13px;
+            cursor: pointer;
+            pointer-events: auto;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        body.mobile-device .game-details {
+            display: none;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            padding: 8px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,0,255,0.3);
+        }
+        
+        body.mobile-device .game-details.visible {
+            display: block;
+        }
+        
+        body.mobile-device #start-button {
+            width: 80%;
+            padding: 12px 15px;
+            font-size: 18px;
+            margin: 15px auto 10px auto;
+            display: block;
+            background: linear-gradient(to right, #ff00ff, #00ffff);
+            border: none;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+            box-shadow: 0 0 15px rgba(255,0,255,0.5);
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+        
+        /* Mobile level selection styles */
+        body.mobile-device h2 {
+            font-size: 18px;
+            margin: 15px 0 10px 0;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0,255,255,0.5);
+        }
+        
+        body.mobile-device .level-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin: 5px 0;
+        }
+        
+        body.mobile-device .level-button {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,0,255,0.4);
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        
+        body.mobile-device .level-button.active {
+            background: rgba(255,0,255,0.5);
+            border: 1px solid #00ffff;
+            box-shadow: 0 0 10px #ff00ff;
+        }
+        
+        body.mobile-device .level-description {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,255,255,0.4);
+            border-radius: 5px;
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 13px;
+            display: none;
+        }
+        
+        body.mobile-device .level-description.visible {
+            display: block;
+        }
+        
+        body.mobile-device .level-descriptions-container {
+            margin: 8px 0;
+        }
+        
+        body.mobile-device h3 {
+            font-size: 15px;
+            margin: 12px 0 5px 0;
+        }
+        
+        body.mobile-device .category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px;
+            border-radius: 5px;
+            background: rgba(0,0,0,0.2);
+        }
+        
+        body.mobile-device .category-toggle {
+            background: none;
+            border: none;
+            color: #00ffff;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 5px;
+            pointer-events: auto;
+        }
+        
+        body.mobile-device .category-section {
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+        }
+        
+        body.mobile-device .category-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        body.mobile-device .mobile-controls-info {
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid rgba(0,255,255,0.4);
+            display: none !important; /* Always hide mobile controls explanation */
+        }
+        
+        body.mobile-device .mobile-controls-info p {
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        body.mobile-device #instructions h1 {
+            font-size: 24px;
+            margin: 5px 0 10px 0;
+        }
+        
+        .interval-option {
+            position: fixed;
+            background: rgba(10,10,40,0.95);
+            color: white;
+            padding: 25px 40px;
+            border-radius: 10px;
+            font-size: 42px;
+            font-weight: bold;
+            display: none;
+            border: 5px solid;
+            text-shadow: 0 0 15px;
+            z-index: 1400;
+            pointer-events: auto;
+            box-shadow: 0 0 35px;
+        }
+        
+        #left-option { 
+            top: 50%;
+            left: 25%;
+            transform: translate(-50%, -50%);
+            border-color: #00ffff;
+            box-shadow: 0 0 35px #00ffff;
+            text-shadow: 0 0 15px #00ffff;
+        }
+        
+        #right-option { 
+            top: 50%;
+            right: 25%;
+            transform: translate(50%, -50%);
+            border-color: #ff00ff;
+            box-shadow: 0 0 35px #ff00ff;
+            text-shadow: 0 0 15px #ff00ff;
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10,10,40,0.9);
+            color: #00ffff;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+            pointer-events: auto;
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 20px rgba(255,0,255,0.5);
+            z-index: 1500;
+            max-width: 90%;
+            width: 500px;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+        #instructions h1 {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+            font-size: 2.5rem;
+            margin-top: 10px;
+        }
+        #countdown-timer {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff00ff;
+            font-size: 120px;
+            font-weight: bold;
+            text-shadow: 0 0 30px #00ffff;
+            z-index: 2000;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        #countdown-timer.show {
+            opacity: 1;
+        }
+        #countdown-timer .go {
+            color: #00ffff;
+            font-size: 150px;
+            text-shadow: 0 0 30px #ff00ff;
+        }
+        #pause-menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10,10,40,0.95);
+            color: #00ffff;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px;
+            pointer-events: auto;
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 30px rgba(255,0,255,0.7);
+            z-index: 2500;
+            min-width: 300px;
+            max-width: 90%;
+        }
+        #pause-menu h1 {
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+            margin-bottom: 20px;
+        }
+        #start-button {
+            background: linear-gradient(to right, #ff00ff, #00ffff);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 5px;
+            pointer-events: auto;
+            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+        }
+        #loading-message {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00ffff;
+            background: rgba(10,10,40,0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid #ff00ff;
+        }
+        .game-button {
+            background: linear-gradient(to right, #ff00ff, #00ffff);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 16px;
+            margin: 10px 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            pointer-events: auto;
+            text-shadow: 0 0 5px rgba(255,255,255,0.8);
+            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        #loading-animation {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0;
+            padding: 0;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-top: 4px solid #ff00ff;
+            border-bottom: 4px solid #00ffff;
+            animation: spin 1.5s linear infinite, pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 30px rgba(255,0,255,0.7);
+            pointer-events: none;
+        }
+        #loading-animation:before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            margin: 0;
+            padding: 0;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-right: 4px solid #ff00ff;
+            border-left: 4px solid #00ffff;
+            animation: spin 1s linear infinite reverse;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 15px rgba(255,0,255,0.5); }
+            50% { box-shadow: 0 0 40px rgba(0,255,255,0.8); }
+            100% { box-shadow: 0 0 15px rgba(255,0,255,0.5); }
+        }
+        
+        /* Mobile Controls */
+        #mobile-controls {
+            display: none; /* Hidden by default, shown on mobile */
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%; 
+            height: 200px;
+            z-index: 1; /* Changed to a very low value to ensure it's behind the menu */
+            pointer-events: none;
+        }
+        
+        #joystick-zone {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            pointer-events: auto;
+            border: 2px dashed rgba(0,255,255,0.5);
+            border-radius: 50%;
+            background: rgba(0,0,0,0.2);
+        }
+        
+        #look-joystick-zone {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            pointer-events: auto;
+            border: 2px dashed rgba(255,0,255,0.5);
+            border-radius: 50%;
+            background: rgba(0,0,0,0.2);
+        }
+        
+        #attack-buttons {
+            position: absolute !important;
+            bottom: 180px !important;
+            right: 20px !important;
+            z-index: 3 !important; /* Reduced from 5 to be behind the menu */
+            pointer-events: auto !important;
+        }
+        
+        .attack-button {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: none;
+            box-shadow: 0 0 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: white;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+            flex-direction: column;
+        }
+        
+        .attack-button span {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 3px;
+        }
+        
+        #left-attack {
+            background: linear-gradient(to bottom right, #0099ff, #00ffff);
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 15px #00ffff;
+        }
+        
+        #right-attack {
+            background: linear-gradient(to bottom right, #ff00ff, #ff0066);
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 15px #ff00ff;
+        }
+        
+        body.mobile-device #mobile-controls {
+            height: 180px;
+            background: rgba(0,0,0,0.4);
+            border-top: 2px solid rgba(255,0,255,0.5);
+        }
+        
+        body.mobile-device #joystick-zone {
+            width: 140px;
+            height: 140px;
+            border: 2px dashed rgba(0,255,255,0.7);
+            bottom: 20px;
+            left: 15px;
+        }
+        
+        body.mobile-device #joystick-label {
+            position: absolute;
+            left: 50%;
+            top: -25px;
+            transform: translateX(-50%);
+            color: #00ffff;
+            font-size: 12px;
+            text-shadow: 0 0 5px #00ffff;
+            white-space: nowrap;
+            opacity: 0.7;
+        }
+        
+        body.mobile-device .attack-button {
+            width: 80px !important;
+            height: 80px !important;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            z-index: 5 !important;
+        }
+        
+        body.mobile-device .attack-button span {
+            font-size: 24px;
+            font-weight: bold;
+            white-space: nowrap;
+            text-align: center;
+        }
+        
+        body.mobile-device #left-attack {
+            background: linear-gradient(to bottom right, #0099ff, #00ffff);
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 15px rgba(0,255,255,0.6);
+        }
+        
+        body.mobile-device #right-attack {
+            background: linear-gradient(to bottom right, #ff00ff, #ff0066);
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 15px rgba(255,0,255,0.6);
+        }
+        
+        body.mobile-device .attack-button:active {
+            transform: scale(0.95);
+            opacity: 0.9;
+        }
+        
+        body.mobile-device #left-attack:active {
+            box-shadow: 0 0 20px #00ffff !important;
+        }
+        
+        body.mobile-device #right-attack:active {
+            box-shadow: 0 0 20px #ff00ff !important;
+        }
+        
+        /* Media Queries for Responsive Design */
+        @media screen and (max-width: 768px) {
+            #instructions {
+                padding: 15px;
+                max-height: 80vh;
+            }
+            
+            #instructions h1 {
+                font-size: 1.8rem;
+                margin-top: 5px;
+                margin-bottom: 10px;
+            }
+            
+            #instructions p {
+                font-size: 14px;
+                margin: 8px 0;
+            }
+            
+            .interval-option {
+                padding: 12px 15px;
+                font-size: 24px;
+                border-width: 3px;
+                box-shadow: 0 0 20px;
+            }
+            
+            #left-option {
+                left: 15%;
+            }
+            
+            #right-option {
+                right: 15%;
+            }
+            
+            #countdown-timer {
+                font-size: 80px;
+            }
+            
+            #countdown-timer .go {
+                font-size: 100px;
+            }
+            
+            .button-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .game-button, #start-button {
+                width: 80%;
+                padding: 15px;
+                margin: 5px 0;
+                font-size: 18px;
+            }
+            
+            /* Improved mobile controls */
+            body.mobile-device #mobile-controls {
+                height: 200px;
+            }
+            
+            body.mobile-device #joystick-zone {
+                width: 160px;
+                height: 160px;
+                bottom: 20px;
+                left: 20px;
+            }
+            
+            body.mobile-device .attack-button {
+                width: 80px;
+                height: 80px;
+            }
+            
+            /* Improve touch targets */
+            button, .interval-option {
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+            }
+            
+            /* Look joystick for smaller screens */
+            body.mobile-device #look-joystick-zone {
+                width: 160px !important;
+                height: 160px !important;
+                bottom: 20px !important;
+                right: 20px !important;
+            }
+            
+            body.mobile-device #attack-buttons {
+                bottom: 250px !important;
+                right: 20px !important;
+                z-index: 3 !important; /* Added z-index here too */
+            }
+            
+            body.mobile-device #left-option {
+                right: 110px !important;
+                bottom: 300px !important;
+            }
+            
+            body.mobile-device #right-option {
+                right: 20px !important;
+                bottom: 300px !important;
+            }
+        }
+        
+        @media screen and (max-width: 480px) {
+            #instructions h1 {
+                font-size: 1.5rem;
+            }
+            
+            #instructions p {
+                font-size: 13px;
+                margin: 6px 0;
+            }
+            
+            .interval-option {
+                padding: 8px 12px;
+                font-size: 18px;
+                border-width: 2px;
+            }
+            
+            #left-option {
+                left: 10%;
+                width: auto;
+                min-width: 90px;
+            }
+            
+            #right-option {
+                right: 10%;
+                width: auto;
+                min-width: 90px;
+            }
+            
+            #left-option span, #right-option span {
+                font-size: 14px;
+                margin-bottom: 5px;
+            }
+            
+            #countdown-timer {
+                font-size: 60px;
+            }
+            
+            body.mobile-device #joystick-zone {
+                width: 130px;
+                height: 130px;
+                bottom: 15px;
+                left: 15px;
+            }
+            
+            body.mobile-device .attack-button {
+                width: 90px;
+                height: 90px;
+                font-size: 16px;
+            }
+            
+            body.mobile-device .attack-button span {
+                font-size: 24px;
+            }
+            
+            body.mobile-device #attack-buttons {
+                right: 15px;
+                bottom: 15px;
+                z-index: 3 !important; /* Added z-index here too */
+            }
+            
+            body.mobile-device .attack-button:active {
+                transform: scale(0.95);
+                opacity: 0.9;
+            }
+            
+            body.mobile-device #left-attack:active {
+                box-shadow: 0 0 25px #00ffff;
+            }
+            
+            body.mobile-device #right-attack:active {
+                box-shadow: 0 0 25px #ff00ff;
+            }
+            
+            body.mobile-device .level-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 5px;
+            }
+            
+            body.mobile-device .level-button {
+                width: 35px;
+                height: 35px;
+                font-size: 16px;
+            }
+            
+            /* Additional fixes for very small screens */
+            @media screen and (max-width: 360px) {
+                #instructions h1 {
+                    font-size: 1.3rem;
+                }
+                
+                .interval-option {
+                    font-size: 16px;
+                    padding: 6px 10px;
+                    min-width: 70px;
+                }
+                
+                #left-option, #right-option {
+                    text-align: center;
+                    border-width: 2px;
+                }
+                
+                body.mobile-device #mobile-controls {
+                    height: 150px;
+                }
+                
+                body.mobile-device #joystick-zone {
+                    width: 100px;
+                    height: 100px;
+                    bottom: 10px;
+                    left: 10px;
+                }
+                
+                body.mobile-device #joystick-label {
+                    font-size: 10px;
+                    top: -20px;
+                }
+                
+                body.mobile-device .attack-button {
+                    width: 80px;
+                    height: 80px;
+                    font-size: 14px;
+                }
+                
+                body.mobile-device .attack-button span {
+                    font-size: 20px;
+                }
+                
+                body.mobile-device .level-grid {
+                    grid-template-columns: repeat(4, 1fr);
+                }
+                
+                body.mobile-device .level-button {
+                    width: 32px;
+                    height: 32px;
+                    font-size: 14px;
+                }
+                
+                body.mobile-device #attack-buttons {
+                    right: 10px;
+                    bottom: 10px;
+                    gap: 10px;
+                }
+            }
+            
+            body.mobile-device #look-joystick-zone {
+                width: 130px !important;
+                height: 130px !important;
+                bottom: 15px !important;
+                right: 15px !important;
+            }
+            
+            body.mobile-device #attack-buttons {
+                bottom: 220px !important;
+                right: 15px !important;
+            }
+            
+            body.mobile-device #left-option {
+                right: 100px !important;
+                bottom: 250px !important;
+            }
+            
+            body.mobile-device #right-option {
+                right: 15px !important;
+                bottom: 250px !important;
+            }
+            
+            /* Additional fixes for very small screens */
+            @media screen and (max-width: 360px) {
+                body.mobile-device #look-joystick-zone {
+                    width: 100px !important;
+                    height: 100px !important;
+                    bottom: 10px !important;
+                    right: 10px !important;
+                }
+                
+                body.mobile-device #attack-buttons {
+                    bottom: 150px !important;
+                    right: 10px !important;
+                }
+                
+                body.mobile-device #left-option {
+                    right: 85px !important;
+                    bottom: 200px !important;
+                }
+                
+                body.mobile-device #right-option {
+                    right: 10px !important;
+                    bottom: 200px !important;
+                }
+            }
+        }
+        
+        /* Additional mobile control transparency fixes */
+        body.mobile-device #mobile-controls {
+            background: transparent !important;
+            border-top: none !important;
+        }
+        
+        body.mobile-device #joystick-zone {
+            border: 1px dashed rgba(0,255,255,0.3) !important;
+            background: rgba(0,0,0,0.1) !important;
+        }
+        
+        body.mobile-device #joystick-label {
+            opacity: 0.7;
+            display: none !important; /* Hide the MOVE label */
+        }
+        
+        @media screen and (max-width: 768px) {
+            body.mobile-device #mobile-controls {
+                background: transparent !important;
+                border-top: none !important;
+            }
+        }
+        
+        @media screen and (max-width: 480px) {
+            body.mobile-device #mobile-controls {
+                background: transparent !important;
+                border-top: none !important;
+            }
+        }
+        
+        @media screen and (max-width: 360px) {
+            body.mobile-device #mobile-controls {
+                background: transparent !important;
+                border-top: none !important;
+            }
+            
+            body.mobile-device .attack-button span {
+                font-size: 20px;
+            }
+        }
+        
+        /* Mobile version of the interval options */
+        body.mobile-device .interval-option {
+            padding: 2px 5px;
+            border-width: 1px;
+            box-shadow: 0 0 8px;
+            min-width: auto;
+            background: rgba(10,10,40,0.85);
+            border-radius: 6px;
+            opacity: 0.85;
+            transition: opacity 0.3s;
+        }
+        
+        body.mobile-device .interval-option:active {
+            opacity: 1;
+        }
+        
+        body.mobile-device #left-option {
+            right: 110px;
+            bottom: 280px;
+            transform: none;
+            border-color: rgba(0,255,255,0.8);
+            top: auto;
+            left: auto;
+        }
+        
+        body.mobile-device #right-option {
+            right: 20px;
+            bottom: 280px;
+            transform: none;
+            border-color: rgba(255,0,255,0.8);
+            top: auto;
+            left: auto;
+        }
+        
+        /* Compact interval format for mobile */
+        body.mobile-device .interval-compact {
+            font-size: 18px;
+            font-weight: bold;
+            white-space: nowrap;
+            line-height: 1;
+        }
+        
+        body.mobile-device .interval-text {
+            font-size: 22px;
+            font-weight: bold;
+        }
+        
+        body.mobile-device .direction-arrow {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-bottom: 2px;
+        }
+        
+        /* The interval text inside the option */
+        .interval-text {
+            line-height: 1.1;
+        }
+        
+        .direction-arrow {
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        
+        /* Even smaller screens */
+        @media screen and (max-width: 320px) {
+            .interval-option {
+                font-size: 14px;
+                padding: 5px 8px;
+                min-width: 60px;
+            }
+            
+            #left-option {
+                left: 3%;
+            }
+            
+            #right-option {
+                right: 3%;
+            }
+            
+            #left-option span, #right-option span {
+                font-size: 10px;
+                margin-bottom: 2px;
+            }
+            
+            body.mobile-device .interval-option {
+                padding: 2px 5px;
+                border-width: 1px;
+                min-width: auto;
+                opacity: 0.9;
+            }
+            
+            body.mobile-device #left-option {
+                left: 25%;
+                top: 60px;
+            }
+            
+            body.mobile-device #right-option {
+                right: 25%;
+                top: 60px;
+            }
+            
+            body.mobile-device .interval-compact {
+                font-size: 16px;
+            }
+            
+            body.mobile-device .interval-text {
+                font-size: 18px;
+            }
+            
+            body.mobile-device .direction-arrow {
+                font-size: 14px;
+                margin-bottom: 0;
+            }
+        }
+        
+        /* Extra small screen sizes */
+        @media screen and (max-width: 280px) {
+            body.mobile-device .interval-option {
+                padding: 2px 4px;
+                min-width: auto;
+                box-shadow: 0 0 6px;
+                border-width: 1px;
+            }
+            
+            body.mobile-device #left-option {
+                left: 20%;
+                top: 50px;
+            }
+            
+            body.mobile-device #right-option {
+                right: 20%;
+                top: 50px;
+            }
+            
+            body.mobile-device .interval-compact {
+                font-size: 14px;
+            }
+            
+            body.mobile-device .interval-text {
+                font-size: 16px;
+            }
+            
+            body.mobile-device .direction-arrow {
+                font-size: 12px;
+            }
+            
+            body.mobile-device .interval-option span {
+                font-size: 8px;
+                margin-bottom: 1px;
+            }
+            
+            body.mobile-device .attack-button {
+                width: 70px;
+                height: 70px;
+                font-size: 12px;
+            }
+            
+            body.mobile-device .attack-button span {
+                font-size: 18px;
+            }
+        }
+        
+        body.mobile-device #look-joystick-zone {
+            width: 140px;
+            height: 140px;
+            border: 2px dashed rgba(255,0,255,0.7);
+            bottom: 20px;
+            right: 15px;
+            background: rgba(0,0,0,0.1);
+        }
+        
+        body.mobile-device #look-joystick-label {
+            position: absolute;
+            left: 50%;
+            top: -25px;
+            transform: translateX(-50%);
+            color: #ff00ff;
+            font-size: 12px;
+            text-shadow: 0 0 5px #ff00ff;
+            white-space: nowrap;
+            opacity: 0.7;
+        }
+        
+        body.mobile-device #attack-buttons {
+            position: absolute !important;
+            display: flex !important;
+            bottom: 180px !important; 
+            right: 20px !important;
+            gap: 15px !important;
+            z-index: 3 !important; /* Reduced from 5 to be behind the menu */
+            pointer-events: auto !important;
+        }
+        
+        body.mobile-device #left-option {
+            position: absolute !important;
+            right: 110px !important;
+            bottom: 250px !important;
+            transform: none !important;
+            border-color: rgba(0,255,255,0.8) !important;
+            top: auto !important;
+            left: auto !important;
+            z-index: 1400 !important; /* Consistent with .interval-option */
+        }
+        
+        body.mobile-device #right-option {
+            position: absolute !important;
+            right: 20px !important;
+            bottom: 250px !important;
+            transform: none !important;
+            border-color: rgba(255,0,255,0.8) !important;
+            top: auto !important;
+            left: auto !important;
+            z-index: 1400 !important; /* Consistent with .interval-option */
+        }
+        
+        @media screen and (max-width: 768px) {
+            body.mobile-device #mobile-controls {
+                background: transparent !important;
+                border-top: none !important;
+            }
+        }
+        
+        @media screen and (max-width: 480px) {
+            body.mobile-device #mobile-controls {
+                background: transparent !important;
+                border-top: none !important;
+            }
+        }
+        
+        @media screen and (max-width: 360px) {
+            body.mobile-device #mobile-controls {
+                background: transparent !important;
+                border-top: none !important;
+            }
+            
+            body.mobile-device .attack-button span {
+                font-size: 20px;
+            }
+        }
+        
+        /* Media query overrides for different screen sizes */
+        @media screen and (max-width: 480px) {
+            body.mobile-device #attack-buttons {
+                bottom: 170px !important;
+                right: 15px !important;
+                z-index: 3 !important; /* Added z-index here too */
+            }
+            
+            body.mobile-device #left-option {
+                right: 100px !important;
+                bottom: 240px !important;
+            }
+            
+            body.mobile-device #right-option {
+                right: 15px !important;
+                bottom: 240px !important;
+            }
+        }
+        
+        @media screen and (max-width: 360px) {
+            body.mobile-device #attack-buttons {
+                bottom: 150px !important;
+                right: 10px !important;
+                z-index: 3 !important; /* Added z-index here too */
+            }
+            
+            body.mobile-device #left-option {
+                right: 85px !important;
+                bottom: 220px !important;
+            }
+            
+            body.mobile-device #right-option {
+                right: 10px !important;
+                bottom: 220px !important;
+            }
+        }
+        
+        /* Mobile-specific loading animation positioning */
+        body.mobile-device #loading-container {
+            display: none;  /* Will be set to flex when shown */
+            justify-content: center !important;
+            align-items: flex-start !important; /* Align to top instead of center */
+        }
+        
+        body.mobile-device #loading-animation {
+            position: relative !important;
+            transform: none !important;
+            top: auto !important;
+            left: auto !important;
+            margin: 35vh auto auto auto !important; /* Position higher - at 35% from the top */
+        }
+        
+        /* Mobile Landscape Responsive Design */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+            /* Instructions panel for landscape mobile */
+            #instructions {
+                width: 85%;
+                max-width: 700px;
+                max-height: 80vh;
+                padding: 10px;
+                font-size: 14px;
+                overflow-y: auto;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                box-sizing: border-box;
+            }
+            
+            #instructions h1 {
+                font-size: 1.6rem;
+                margin-top: 0;
+                margin-bottom: 8px;
+            }
+            
+            /* Pause menu for landscape mobile */
+            #pause-menu {
+                width: 80%;
+                max-width: 500px;
+                max-height: 75vh;
+                padding: 15px;
+                overflow-y: auto;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                box-sizing: border-box;
+            }
+            
+            #pause-menu h1 {
+                font-size: 1.4rem;
+                margin-bottom: 10px;
+                margin-top: 0;
+            }
+            
+            /* Countdown timer adjustment for landscape */
+            #countdown-timer {
+                top: 40%;
+                font-size: 70px;
+            }
+            
+            #countdown-timer .go {
+                font-size: 90px;
+            }
+            
+            /* Game buttons smaller for landscape */
+            .game-button {
+                padding: 6px 12px;
+                font-size: 13px;
+                margin: 5px 3px;
+            }
+            
+            #start-button {
+                padding: 6px 12px;
+                font-size: 13px;
+                margin: 5px 0;
+            }
+            
+            /* Mobile controls adjustments */
+            #mobile-controls {
+                height: 120px;
+            }
+            
+            #joystick-zone {
+                width: 90px;
+                height: 90px;
+                bottom: 10px;
+                left: 10px;
+            }
+            
+            #look-joystick-zone {
+                width: 90px;
+                height: 90px;
+                bottom: 10px;
+                right: 10px;
+            }
+            
+            #attack-buttons {
+                bottom: 105px !important;
+                right: 10px !important;
+            }
+            
+            /* Smaller button sizes for landscape */
+            .attack-button {
+                width: 45px;
+                height: 45px;
+                font-size: 12px;
+                margin: 1px;
+            }
+        }
+        
+        /* Additional mobile landscape optimizations for very short screens */
+        @media screen and (max-height: 400px) and (orientation: landscape) {
+            #instructions {
+                width: 90%;
+                max-height: 85vh;
+                padding: 8px;
+                font-size: 12px;
+                top: 50%;
+                transform: translate(-50%, -50%);
+            }
+            
+            #instructions h1 {
+                font-size: 1.3rem;
+                margin-top: 0;
+                margin-bottom: 5px;
+            }
+            
+            #pause-menu {
+                width: 85%;
+                max-height: 80vh;
+                padding: 10px;
+                top: 50%;
+                transform: translate(-50%, -50%);
+            }
+            
+            #pause-menu h1 {
+                font-size: 1.2rem;
+                margin-bottom: 8px;
+                margin-top: 0;
+            }
+            
+            #countdown-timer {
+                top: 45%;
+                font-size: 50px;
+            }
+            
+            #countdown-timer .go {
+                font-size: 70px;
+            }
+            
+            .game-button {
+                padding: 4px 8px;
+                font-size: 11px;
+                margin: 3px 2px;
+            }
+            
+            #start-button {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+        }
+        
+        /* Landscape-specific styling for dynamically created overlays */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+            /* Game over and victory message adjustments */
+            #game-over-message,
+            #victory-message {
+                width: 85% !important;
+                max-width: 600px !important;
+                max-height: 80vh !important;
+                padding: 10px !important;
+                font-size: 13px !important;
+                overflow-y: auto !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                box-sizing: border-box !important;
+            }
+            
+            #game-over-message h1,
+            #victory-message h1 {
+                font-size: 1.3rem !important;
+                margin-bottom: 8px !important;
+                margin-top: 0 !important;
+            }
+            
+            #game-over-message button,
+            #victory-message button {
+                padding: 6px 12px !important;
+                font-size: 12px !important;
+                margin: 3px 2px !important;
+            }
+            
+            /* Score breakdown sections */
+            #game-over-message div[style*="border"],
+            #victory-message div[style*="border"] {
+                padding: 8px !important;
+                margin: 10px 0 !important;
+                font-size: 12px !important;
+            }
+            
+            /* Button containers */
+            #game-over-message div[style*="flex"],
+            #victory-message div[style*="flex"] {
+                margin-top: 10px !important;
+                gap: 5px !important;
+            }
+        }
+        
+        /* Very short landscape screens */
+        @media screen and (max-height: 400px) and (orientation: landscape) {
+            #game-over-message,
+            #victory-message {
+                width: 90% !important;
+                max-width: 650px !important;
+                max-height: 85vh !important;
+                padding: 8px !important;
+                font-size: 11px !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) !important;
+            }
+            
+            #game-over-message h1,
+            #victory-message h1 {
+                font-size: 1.1rem !important;
+                margin-bottom: 5px !important;
+                margin-top: 0 !important;
+            }
+            
+            #game-over-message button,
+            #victory-message button {
+                padding: 4px 8px !important;
+                font-size: 10px !important;
+                margin: 2px 1px !important;
+            }
+            
+            #game-over-message div[style*="border"],
+            #victory-message div[style*="border"] {
+                padding: 6px !important;
+                margin: 8px 0 !important;
+                font-size: 10px !important;
+            }
+            
+            #game-over-message div[style*="flex"],
+            #victory-message div[style*="flex"] {
+                margin-top: 8px !important;
+                gap: 3px !important;
+            }
+        }
+        
+        /* Absolute viewport constraint for all overlays in landscape */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+            #instructions,
+            #pause-menu,
+            #game-over-message,
+            #victory-message {
+                position: fixed !important;
+                top: 50% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                max-height: 80vh !important;
+                max-width: 90vw !important;
+                overflow-y: auto !important;
+                box-sizing: border-box !important;
+                margin: 0 !important;
+            }
+        }
+        
+        @media screen and (max-height: 400px) and (orientation: landscape) {
+            #instructions,
+            #pause-menu,
+            #game-over-message,
+            #victory-message {
+                max-height: 85vh !important;
+                padding: 8px !important;
+            }
+        }
+        
+        /* Emergency viewport constraint - prevent any element from exceeding screen bounds */
+        @media screen and (orientation: landscape) and (max-height: 500px) {
+            * {
+                max-height: calc(100vh - 10px) !important;
+            }
+            
+            #instructions,
+            #pause-menu,
+            #game-over-message,
+            #victory-message {
+                bottom: auto !important;
+                right: auto !important;
+            }
+        }
+        
+        /* Crosshair Z-Index Management - Ensure crosshairs always stay behind overlay menus */
+        .game-crosshair,
+        #game-crosshair,
+        div[style*="position: fixed"][style*="top: 50%"][style*="left: 50%"] {
+            z-index: 15 !important;
+        }
+        
+        /* Force any crosshair-like elements to stay behind menus */
+        [style*="transform: translate(-50%, -50%)"][style*="position: fixed"] {
+            z-index: 15 !important;
+        }
+        
+        /* Hide crosshair when main menu is visible */
+        #instructions:not([style*="display: none"]) ~ #game-crosshair,
+        #instructions:not([style*="display: none"]) ~ .game-crosshair {
+            display: none !important;
+        }
+        
+        /* Overlay menus should always be above crosshairs */
+        #instructions,
+        #pause-menu,
+        #game-over-message,
+        #victory-message {
+            z-index: 1500 !important;
+            position: fixed !important;
+        }
+        
+        #countdown-timer {
+            z-index: 2000 !important;
+        }
+        
+        #pause-menu {
+            z-index: 2500 !important;
+        }
+        
+        #loading-container {
+            z-index: 3000 !important;
+        }
+        
+        /* Make sure interval options stay above crosshairs but below main menus */
+        .interval-option {
+            z-index: 1400 !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-container">
+        <div id="left-option" class="interval-option">
+            <span style="display:block;font-size:18px;opacity:0.9;margin-bottom:10px">LEFT CLICK</span>
+            <div class="interval-text">Interval</div>
+        </div>
+        <div id="right-option" class="interval-option">
+            <span style="display:block;font-size:18px;opacity:0.9;margin-bottom:10px">RIGHT CLICK</span>
+            <div class="interval-text">Interval</div>
+        </div>
+        <div id="instructions">
+            <h1>Inter(Val) Hunter</h1>
+            <p class="main-description">Listen to the intervals played by enemies and shoot the correct option.</p>
+            
+            <div class="mobile-only" style="display:none;">
+                <button class="detail-toggle">Game Details ▼</button>
+                <div class="game-details">
+                    <p>This ear training game helps you recognize musical intervals by sound. Listen carefully to the notes played by each enemy, then select the correct interval.</p>
+                    <p>Higher levels introduce more challenging intervals to identify.</p>
+                </div>
+            </div>
+            
+            <div class="controls-info">
+                <div class="desktop-controls">
+                    <p>Use WASD to move, mouse to look around.</p>
+                    <p>Left click to select left option, right click to select right option.</p>
+                </div>
+                <div class="mobile-controls-info" style="display:none;">
+                    <p><b>Movement:</b> Use the joystick in bottom left corner</p>
+                    <p><b>Look:</b> Swipe anywhere on the screen</p>
+                    <p><b>Select intervals:</b> Tap the LEFT/RIGHT buttons in bottom right</p>
+                </div>
+            </div>
+            <button id="start-button">Start Game</button>
+        </div>
+        <div id="loading-message">Loading game...</div>
+        
+        <!-- Pause Menu -->
+        <div id="pause-menu" style="display: none;">
+            <h1>Game Paused</h1>
+            <div class="button-container">
+                <button id="pause-continue-button" class="game-button">Continue</button>
+                <button id="pause-main-menu-button" class="game-button">Main Menu</button>
+            </div>
+        </div>
+        
+        <!-- Loading Animation -->
+        <div id="loading-container" style="position: fixed; width: 100vw; height: 100vh; top: 0; left: 0; z-index: 3000; pointer-events: none; display: none; justify-content: center; align-items: center;">
+            <div id="loading-animation" style="position: relative; transform: none; top: auto; left: auto; margin: auto;"></div>
+        </div>
+        
+        <!-- Countdown Timer -->
+        <div id="countdown-timer"></div>
+        
+        <!-- Mobile Controls -->
+        <div id="mobile-controls">
+            <div id="joystick-zone">
+                <div id="joystick-label">MOVE</div>
+            </div>
+            <div id="look-joystick-zone">
+                <div id="look-joystick-label">LOOK</div>
+            </div>
+            <div id="attack-buttons" style="position:absolute !important; bottom:180px !important; right:20px !important; z-index:3 !important;">
+                <button id="left-attack" class="attack-button">
+                    <span>↑ P4</span>
+                </button>
+                <button id="right-attack" class="attack-button">
+                    <span>↑ P5</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load Three.js from CDN - using stable version with UMD builds -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js" 
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js" 
+            crossorigin="anonymous"></script>
+    
+    <!-- Nipple.js for virtual joystick -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js" 
+            crossorigin="anonymous" 
+            referrerpolicy="no-referrer"></script>
+    
+    <!-- Audio Buffer Pool System -->
+    <script src="buffer_pool.js"></script>
+    
+    <!-- Main game script -->
+    <script src="game.js"></script>
+    
+    <!-- Add a fallback checker -->
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof THREE === 'undefined' || typeof THREE.PointerLockControls === 'undefined') {
+                console.error("Required libraries not loaded properly.");
+                document.getElementById('loading-message').textContent = 
+                    "Error: Three.js libraries not loaded. Please check your internet connection and try again.";
+                document.getElementById('loading-message').style.color = "red";
+            }
+        });
+    </script>
+    
+    <!-- Load your game script after DOM is ready -->
+    <script>
+        // Show loading message
+        const loadingMessage = document.getElementById('loading-message');
+        const mobileControls = document.getElementById('mobile-controls');
+        
+        // Detect if device is mobile
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                   (typeof window.orientation !== "undefined") || 
+                   window.innerWidth <= 768;
+        }
+        
+        // Make utility functions globally available for game.js
+        window.deviceUtils = {
+            isMobile: isMobileDevice,
+            setupUI: function() {
+                adjustUIForDevice();
+                setupMobileDetailToggles();
+            }
+        };
+        
+        // Adjust UI for mobile/desktop
+        function adjustUIForDevice() {
+            const isMobile = isMobileDevice();
+            console.log("Device detected as: " + (isMobile ? "Mobile" : "Desktop"));
+            
+            // Show/hide appropriate control instructions
+            const desktopControls = document.querySelector('.desktop-controls');
+            if (desktopControls) {
+                desktopControls.style.display = isMobile ? 'none' : 'block';
+            }
+            
+            // Show/hide mobile-only elements
+            document.querySelectorAll('.mobile-only').forEach(el => {
+                el.style.display = isMobile ? 'block' : 'none';
+            });
+            
+            // Update interval option labels with error checking
+            try {
+                const leftOptionSpan = document.querySelector('#left-option span');
+                const rightOptionSpan = document.querySelector('#right-option span');
+                
+                if (leftOptionSpan) {
+                    leftOptionSpan.textContent = isMobile ? 'LEFT TAP' : 'LEFT CLICK';
+                }
+                if (rightOptionSpan) {
+                    rightOptionSpan.textContent = isMobile ? 'RIGHT TAP' : 'RIGHT CLICK';
+                }
+            } catch (error) {
+                console.warn("Could not update interval option labels:", error);
+            }
+            
+            // Apply appropriate styles
+            if (isMobile) {
+                document.body.classList.add('mobile-device');
+                if (mobileControls) {
+                    mobileControls.style.display = 'block';
+                }
+                
+                // Add mobile indicator if in debug mode
+                if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+                    if (!document.getElementById('mobile-indicator')) {
+                        const mobileIndicator = document.createElement('div');
+                        mobileIndicator.id = 'mobile-indicator';
+                        mobileIndicator.style.position = 'fixed';
+                        mobileIndicator.style.top = '10px';
+                        mobileIndicator.style.right = '10px';
+                        mobileIndicator.style.background = 'rgba(255,0,255,0.8)';
+                        mobileIndicator.style.color = 'white';
+                        mobileIndicator.style.padding = '5px 10px';
+                        mobileIndicator.style.borderRadius = '5px';
+                        mobileIndicator.style.zIndex = '10000';
+                        mobileIndicator.style.fontSize = '12px';
+                        mobileIndicator.textContent = 'Mobile Mode';
+                        document.body.appendChild(mobileIndicator);
+                    }
+                }
+            } else {
+                document.body.classList.remove('mobile-device');
+                if (mobileControls) {
+                    mobileControls.style.display = 'none';
+                }
+                
+                // Remove mobile indicator if exists
+                const mobileIndicator = document.getElementById('mobile-indicator');
+                if (mobileIndicator) {
+                    mobileIndicator.remove();
+                }
+            }
+        }
+        
+        // Setup detail toggles for mobile UI
+        function setupMobileDetailToggles() {
+            const detailToggles = document.querySelectorAll('.detail-toggle');
+            
+            detailToggles.forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    // Find the next element (the details container)
+                    const detailsContainer = this.nextElementSibling;
+                    
+                    // Toggle visibility
+                    if (detailsContainer.classList.contains('visible')) {
+                        detailsContainer.classList.remove('visible');
+                        this.textContent = this.textContent.replace('▲', '▼');
+                    } else {
+                        detailsContainer.classList.add('visible');
+                        this.textContent = this.textContent.replace('▼', '▲');
+                    }
+                });
+            });
+        }
+        
+        // Wait for DOM to be fully loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            loadingMessage.textContent = "DOM loaded, loading game script...";
+            
+            // Remove mobile controls info explanation
+            const mobileControlsInfo = document.querySelector('.mobile-controls-info');
+            if (mobileControlsInfo) {
+                mobileControlsInfo.style.display = 'none';
+                mobileControlsInfo.innerHTML = ''; // Clear the content
+            }
+            
+            // Remove joystick label
+            const joystickLabel = document.getElementById('joystick-label');
+            if (joystickLabel) {
+                joystickLabel.style.display = 'none';
+            }
+            
+            // Adjust UI based on device
+            adjustUIForDevice();
+            
+            // Setup mobile detail toggles
+            setupMobileDetailToggles();
+            
+            // Re-adjust on orientation change or resize
+            window.addEventListener('resize', adjustUIForDevice);
+            window.addEventListener('orientationchange', adjustUIForDevice);
+            
+            // Create script element for game.js
+            const gameScript = document.createElement('script');
+            gameScript.src = 'game.js?v=' + Date.now();
+            gameScript.type = 'text/javascript';
+            
+            // Handle errors loading game.js
+            gameScript.onerror = () => {
+                loadingMessage.textContent = "Error loading game script!";
+                loadingMessage.style.color = "red";
+            };
+            
+            // Handle successful load
+            gameScript.onload = () => {
+                loadingMessage.textContent = "Game script loaded, initializing...";
+                
+                // Make sure all game initialization happens after DOM is fully loaded
+                if (typeof initGame === 'function') {
+                    // Small delay to ensure everything is ready
+                    setTimeout(() => {
+                        try {
+                            initGame();
+                            
+                            // Re-check mobile status after game init
+                            setTimeout(adjustUIForDevice, 1000);
+                            
+                            loadingMessage.textContent = "Game initialized successfully!";
+                            setTimeout(() => {
+                                loadingMessage.style.opacity = "0";
+                                setTimeout(() => loadingMessage.style.display = "none", 1000);
+                            }, 2000);
+                        } catch (error) {
+                            loadingMessage.textContent = "Game initialization failed: " + error.message;
+                            loadingMessage.style.color = "red";
+                            console.error("Game initialization error:", error);
+                        }
+                    }, 100);
+                } else {
+                    loadingMessage.textContent = "Error: Game initialization function not found!";
+                    loadingMessage.style.color = "red";
+                }
+            };
+            
+            // Add script to document
+            document.body.appendChild(gameScript);
+            loadingMessage.textContent = "Game script requested...";
+        });
+    </script>
+</body>
+</html>
