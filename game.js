@@ -5372,6 +5372,18 @@ function activateEnemy(enemy) {
     enemy.userData.active = true;
     window.gameState.activeEnemy = enemy;
     
+    // Highlight active enemy in red (mesh and attached light)
+    if (enemy.material && enemy.material.color) {
+        enemy.material.color.set(0xff0000);
+    }
+    if (enemy.children && enemy.children.length) {
+        enemy.children.forEach(child => {
+            if (child.isPointLight && child.color) {
+                child.color.set(0xff0000);
+            }
+        });
+    }
+    
     // Select a random interval from the current level
     const levelIntervals = window.intervalLevels[window.gameState.selectedLevel].intervals;
     const correctInterval = levelIntervals[Math.floor(Math.random() * levelIntervals.length)];
@@ -5599,6 +5611,18 @@ function deactivateEnemy(enemy) {
     if (enemy.userData.pulseAnimation) {
         clearInterval(enemy.userData.pulseAnimation);
         enemy.userData.pulseAnimation = null;
+    }
+    
+    // Reset enemy color to default yellow (mesh and attached light)
+    if (enemy.material && enemy.material.color) {
+        enemy.material.color.set(0xffff00);
+    }
+    if (enemy.children && enemy.children.length) {
+        enemy.children.forEach(child => {
+            if (child.isPointLight && child.color) {
+                child.color.set(0xffff00);
+            }
+        });
     }
     
     // Hide interval options
