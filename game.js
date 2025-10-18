@@ -1,10 +1,54 @@
-console.log("Game script loading...");
-
 // Wait for DOM and Three.js to be fully loaded before initializing
 window.addEventListener('load', () => {
-    console.log("Window loaded, initializing game...");
     initGame();
 });
+
+// Viewport sizing and gesture lock utilities
+function getViewportSize() {
+    const vv = window.visualViewport;
+    const width = vv ? Math.round(vv.width) : window.innerWidth;
+    const height = vv ? Math.round(vv.height) : window.innerHeight;
+    return { width, height };
+}
+
+function resizeRendererToViewport() {
+    try {
+        if (!window.renderer || !window.camera) return;
+        const { width, height } = getViewportSize();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        window.renderer.setPixelRatio(dpr);
+        window.renderer.setSize(width, height, false);
+        if (window.camera && window.camera.isPerspectiveCamera) {
+            window.camera.aspect = width / Math.max(1, height);
+            window.camera.updateProjectionMatrix();
+        }
+        if (window.scene) {
+            window.renderer.render(window.scene, window.camera);
+        }
+    } catch (e) {
+        console.warn('Viewport resize failed:', e);
+    }
+}
+
+function initViewportLock() {
+    // Block browser zoom/pan gestures
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('gesturechange', e => e.preventDefault());
+    document.addEventListener('gestureend', e => e.preventDefault());
+    document.addEventListener('touchstart', e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+    document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+
+    // Listen for all viewport changes, including address bar show/hide
+    window.addEventListener('resize', resizeRendererToViewport);
+    window.addEventListener('orientationchange', () => setTimeout(resizeRendererToViewport, 0));
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', resizeRendererToViewport);
+    }
+
+    // Initial sizing
+    resizeRendererToViewport();
+}
 
 // Helper functions for loading animation
 function showLoadingAnimation() {
@@ -37,7 +81,7 @@ function showLoadingAnimation() {
             }
         }
         
-        console.log("Loading animation shown successfully");
+        if (window.config && window.config.debugLogging) console.log("Loading animation shown");
     } catch (error) {
         console.error("Error showing loading animation:", error);
     }
@@ -54,7 +98,7 @@ function hideLoadingAnimation() {
         // Hide the container
         loadingContainer.style.display = 'none';
         
-        console.log("Loading animation hidden successfully");
+        if (window.config && window.config.debugLogging) console.log("Loading animation hidden");
     } catch (error) {
         console.error("Error hiding loading animation:", error);
     }
@@ -63,7 +107,7 @@ function hideLoadingAnimation() {
 // Main initialization function
 function initGame() {
     try {
-        console.log("Starting game initialization");
+        if (window.config && window.config.debugLogging) console.log("Starting game initialization");
         
         // Initialize variables first
         initVariables();
@@ -71,15 +115,22 @@ function initGame() {
         // Initialize Three.js first to have rendering available
         initThreeJS();
         
+        // Lock viewport sizing and gestures once renderer/camera exist
+        initViewportLock();
+        
         // Set up DOM event handlers
         setupEventHandlers();
         
-        // Create the default scene (synthwave sky) so there's something visible
-        createSynthwaveSky();
+        // Create the default scene; prefer simpler sky on mobile
+        if (isMobileDevice()) {
+            createSimpleSkyBackdrop();
+        } else {
+            createSynthwaveSky();
+        }
         
         // Do an initial render to show something
         if (window.scene && window.camera && window.renderer) {
-            console.log("Performing initial render");
+            if (window.config && window.config.debugLogging) console.log("Performing initial render");
             window.renderer.render(window.scene, window.camera);
         } else {
             console.error("Scene, camera, or renderer not initialized properly");
@@ -99,10 +150,10 @@ function initGame() {
         window.prevTime = performance.now();
         
         // Start animation loop
-        console.log("Starting animation loop");
+        if (window.config && window.config.debugLogging) console.log("Starting animation loop");
         window.animationFrameId = requestAnimationFrame(animate);
         
-        console.log("Game initialization complete");
+        if (window.config && window.config.debugLogging) console.log("Game initialization complete");
         document.getElementById('loading-message').style.display = 'none';
     } catch (error) {
         console.error("Game initialization failed:", error);
@@ -115,24 +166,7 @@ function initGame() {
 
 // Set up DOM event handlers
 function setupEventHandlers() {
-    console.log("Setting up DOM event handlers");
-    
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        if (window.camera && window.renderer) {
-            // Update camera
-            window.camera.aspect = window.innerWidth / window.innerHeight;
-            window.camera.updateProjectionMatrix();
-            
-            // Update renderer
-            window.renderer.setSize(window.innerWidth, window.innerHeight);
-            
-            // Force a render
-            if (window.scene) {
-                window.renderer.render(window.scene, window.camera);
-            }
-        }
-    });
+    if (window.config && window.config.debugLogging) console.log("Setting up DOM event handlers");
     
     // Handle visibility change to pause game when tab is not visible
     document.addEventListener('visibilitychange', () => {
@@ -140,7 +174,7 @@ function setupEventHandlers() {
             // Page is not visible, pause game if it's running
             if (window.gameState && window.gameState.started && 
                 !window.gameState.paused && !window.gameState.gameOver) {
-                console.log("Auto-pausing game due to tab visibility change");
+                if (window.config && window.config.debugLogging) console.log("Auto-pausing game due to tab visibility change");
                 togglePauseMenu();
             }
         }
@@ -149,7 +183,7 @@ function setupEventHandlers() {
 
 // Initialize all variables
 function initVariables() {
-    console.log("Initializing variables");
+    if (window.config && window.config.debugLogging) console.log("Initializing variables");
     
     // Game configuration
     window.config = {
@@ -167,7 +201,8 @@ function initVariables() {
         goalDistance: 10, // Increased from 5 to match new corridor width
         skyRadius: 1000, // New parameter for sky sphere size
         backgroundMusicVolume: 0.6, // Default volume for background music
-        missedProjectilePenalty: 25 // Penalty for missing a projectile - same as wrong answer
+        missedProjectilePenalty: 25, // Penalty for missing a projectile - same as wrong answer
+        debugLogging: false // Reduce runtime logging unless explicitly enabled
     };
     
     // Apply mobile optimizations for better performance
@@ -378,8 +413,19 @@ function initVariables() {
     
     // Game objects
     window.walls = [];
+    window.wallBoxes = [];
     window.enemies = [];
     window.projectiles = [];
+    window.projectilePool = [];
+    window.sharedProjectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+    window.sharedProjectileMaterialLeft = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
+    window.sharedProjectileMaterialRight = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.8 });
+
+    // Explosion particle pooling/shared resources
+    window.explosionPool = [];
+    window.sharedExplosionMaterial = new THREE.MeshBasicMaterial({ color: 0x66ff66, transparent: true, opacity: 1 });
+    window.sharedExplosionGeomA = new THREE.TetrahedronGeometry(0.15, 0);
+    window.sharedExplosionGeomB = new THREE.BoxGeometry(0.15, 0.15, 0.15);
     
     // Intervals (musical)
     window.intervals = {
@@ -414,7 +460,7 @@ function initVariables() {
         'C5': 523.25
     };
     
-    console.log("Variables initialized");
+    if (window.config && window.config.debugLogging) console.log("Variables initialized");
     
     // Add audio unlock for mobile devices
     setupMobileAudioUnlock();
@@ -422,21 +468,16 @@ function initVariables() {
 
 // Add a global audio unlock function for mobile devices 
 function setupMobileAudioUnlock() {
-    if (!isMobileDevice()) return;
-    
-    console.log("Setting up mobile audio unlock on first touch");
-    
+    if (!(window.deviceUtils && window.deviceUtils.isMobile && window.deviceUtils.isMobile())) return;
+    if (window.config && window.config.debugLogging) console.log("Setting up mobile audio unlock on first touch");
+
     // Create a listener that will unlock audio on the first interaction
     const unlockAudio = function() {
-        // Only run once
-        document.body.removeEventListener('touchstart', unlockAudio);
-        document.body.removeEventListener('touchend', unlockAudio);
-        document.body.removeEventListener('click', unlockAudio);
         
         // Try to resume audio context if suspended
         if (window.audioContext && window.audioContext.state === 'suspended') {
             window.audioContext.resume().then(() => {
-                console.log("Audio context resumed from global touch handler");
+                if (window.config && window.config.debugLogging) console.log("Audio context resumed from global touch handler");
             }).catch(err => {
                 console.warn("Could not resume audio context:", err);
             });
@@ -450,21 +491,20 @@ function setupMobileAudioUnlock() {
         if (isIOS) {
             // Check if we need to create the manual button for iOS
             if (window.audioContext && window.audioContext.state !== 'running') {
-                console.log("iOS audio context still not running after unlock, creating button");
+                if (window.config && window.config.debugLogging) console.log("iOS audio context still not running after unlock, creating button");
                 createIOSMusicButton();
             } else if (window.backgroundMusicElement && window.backgroundMusicElement.paused) {
-                console.log("iOS music still paused after unlock, creating button");
+                if (window.config && window.config.debugLogging) console.log("iOS music still paused after unlock, creating button");
                 createIOSMusicButton();
             }
         }
-        
-        console.log("Global audio unlock triggered");
+        if (window.config && window.config.debugLogging) console.log("Global audio unlock triggered");
     };
     
-    // Add multiple listeners to catch any user interaction
-    document.body.addEventListener('touchstart', unlockAudio, false);
-    document.body.addEventListener('touchend', unlockAudio, false);
-    document.body.addEventListener('click', unlockAudio, false);
+    // Add listeners with once:true so they auto-remove
+    document.body.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+    document.body.addEventListener('touchend', unlockAudio, { passive: true, once: true });
+    document.body.addEventListener('click', unlockAudio, { once: true });
     
     // Special handling for iOS
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -473,7 +513,7 @@ function setupMobileAudioUnlock() {
         // We'll create it after a short delay if no interaction occurs
         setTimeout(() => {
             if (!window.audioUnlockAttempted) {
-                console.log("No user interaction detected, adding iOS button");
+                if (window.config && window.config.debugLogging) console.log("No user interaction detected, adding iOS button");
                 createIOSMusicButton();
             }
         }, 1000);
@@ -482,11 +522,11 @@ function setupMobileAudioUnlock() {
 
 // Initialize audio context
 function initAudio() {
-    console.log("Initializing audio");
+    if (window.config && window.config.debugLogging) console.log("Initializing audio");
     
     try {
         window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        console.log("Audio context created");
+        if (window.config && window.config.debugLogging) console.log("Audio context created");
         
         // Initialize audio buffer pool for sound effects (NOT intervals)
         initAudioBufferPool();
@@ -500,7 +540,7 @@ function initAudio() {
 
 // Load and prepare background music
 function loadBackgroundMusic() {
-    console.log("Loading background music");
+    if (window.config && window.config.debugLogging) console.log("Loading background music");
     
     // URL to the background music file (synthwave style)
     const musicUrl = 'assets/music/background-synthwave.mp3';
@@ -512,7 +552,7 @@ function loadBackgroundMusic() {
     
     // When audio is loaded, set up audio nodes
     audioElement.addEventListener('canplaythrough', () => {
-        console.log("Background music loaded");
+        if (window.config && window.config.debugLogging) console.log("Background music loaded");
         
         // Create media element source and gain node
         window.backgroundMusicSource = window.audioContext.createMediaElementSource(audioElement);
@@ -530,10 +570,10 @@ function loadBackgroundMusic() {
         
         // Check if we should play music immediately (used when playBackgroundMusic was called before music was loaded)
         if (window.shouldPlayMusicAfterLoad && window.gameState.started) {
-            console.log("Playing music now that it's loaded (delayed start)");
+            if (window.config && window.config.debugLogging) console.log("Playing music now that it's loaded (delayed start)");
             setTimeout(() => playBackgroundMusic(), 100);
         } else {
-            console.log("Background music ready but waiting for countdown to play");
+            if (window.config && window.config.debugLogging) console.log("Background music ready but waiting for countdown to play");
         }
     });
     
@@ -550,11 +590,11 @@ function loadBackgroundMusic() {
 
 // Play background music
 function playBackgroundMusic(immediate = false) {
-    console.log("Playing background music" + (immediate ? " (immediate mode)" : ""));
+    if (window.config && window.config.debugLogging) console.log("Playing background music" + (immediate ? " (immediate mode)" : ""));
     
     // Skip if music is already playing to avoid duplicate music
     if (window.gameState.backgroundMusicPlaying && window.backgroundMusicElement && !window.backgroundMusicElement.paused) {
-        console.log("Music already playing, not starting again");
+        if (window.config && window.config.debugLogging) console.log("Music already playing, not starting again");
         return;
     }
     
@@ -562,7 +602,7 @@ function playBackgroundMusic(immediate = false) {
     if (!immediate) {
         // Make sure audio is unlocked first on mobile
         if (isMobileDevice()) {
-            console.log("Trying to force unlock audio before playing music");
+            if (window.config && window.config.debugLogging) console.log("Trying to force unlock audio before playing music");
             forceAudioUnlock();
         }
         
@@ -598,7 +638,7 @@ function playBackgroundMusic(immediate = false) {
         }
     }
     
-    console.log("Attempting to play background music now...");
+    if (window.config && window.config.debugLogging) console.log("Attempting to play background music now...");
     
     // Play music now
     if (window.backgroundMusicElement) {
@@ -611,18 +651,18 @@ function playBackgroundMusic(immediate = false) {
             window.backgroundMusicElement.play()
                 .then(() => {
                     window.gameState.backgroundMusicPlaying = true;
-                    console.log("iOS background music started successfully");
+                    if (window.config && window.config.debugLogging) console.log("iOS background music started successfully");
                 })
                 .catch(err => {
                     console.warn("iOS background music play failed:", err);
                     
                     // Second attempt with a timeout
                     setTimeout(() => {
-                        console.log("Trying iOS music play again after timeout");
+                        if (window.config && window.config.debugLogging) console.log("Trying iOS music play again after timeout");
                         window.backgroundMusicElement.play()
                             .then(() => {
                                 window.gameState.backgroundMusicPlaying = true;
-                                console.log("iOS background music started on second attempt");
+                                if (window.config && window.config.debugLogging) console.log("iOS background music started on second attempt");
                             })
                             .catch(finalErr => {
                                 console.error("iOS final music play attempt failed:", finalErr);
@@ -635,7 +675,7 @@ function playBackgroundMusic(immediate = false) {
                 // On Android, direct play with try/catch can be faster than promise handling
                 window.backgroundMusicElement.play();
                 window.gameState.backgroundMusicPlaying = true;
-                console.log("Android background music started with direct play");
+                if (window.config && window.config.debugLogging) console.log("Android background music started with direct play");
             } catch (err) {
                 console.warn("Android direct play failed, trying promise-based approach:", err);
                 
@@ -643,7 +683,7 @@ function playBackgroundMusic(immediate = false) {
                 window.backgroundMusicElement.play()
                     .then(() => {
                         window.gameState.backgroundMusicPlaying = true;
-                        console.log("Android background music started with promise");
+                        if (window.config && window.config.debugLogging) console.log("Android background music started with promise");
                     })
                     .catch(finalErr => {
                         console.error("Android final play attempt failed:", finalErr);
@@ -657,7 +697,7 @@ function playBackgroundMusic(immediate = false) {
                 playPromise
                     .then(() => {
                         window.gameState.backgroundMusicPlaying = true;
-                        console.log("Background music started successfully");
+                        if (window.config && window.config.debugLogging) console.log("Background music started successfully");
                     })
                     .catch(err => {
                         console.warn("Background music autoplay failed:", err);
@@ -669,11 +709,11 @@ function playBackgroundMusic(immediate = false) {
                         } else {
                             // For mobile, try one more time after a short delay
                             setTimeout(() => {
-                                console.log("Trying mobile music play again after timeout");
+                                if (window.config && window.config.debugLogging) console.log("Trying mobile music play again after timeout");
                                 window.backgroundMusicElement.play()
                                     .then(() => {
                                         window.gameState.backgroundMusicPlaying = true;
-                                        console.log("Mobile background music started on second attempt");
+                                        if (window.config && window.config.debugLogging) console.log("Mobile background music started on second attempt");
                                     })
                                     .catch(e => console.error("Mobile final play attempt failed:", e));
                             }, 50);  // Reduced from 300ms to 50ms for faster retry
@@ -682,7 +722,7 @@ function playBackgroundMusic(immediate = false) {
             } else {
                 // For older browsers that don't return a promise
                 window.gameState.backgroundMusicPlaying = true;
-                console.log("Background music started (legacy browser)");
+                if (window.config && window.config.debugLogging) console.log("Background music started (legacy browser)");
             }
         }
     } else {
@@ -698,7 +738,7 @@ function playBackgroundMusic(immediate = false) {
 
 // New function to handle mobile audio play
 function handleMobileAudioPlay() {
-    console.log("Handling mobile audio play - unlocking only");
+    if (window.config && window.config.debugLogging) console.log("Handling mobile audio play - unlocking only");
     
     // Just unlock audio systems without playing music
     forceAudioUnlock();
@@ -706,7 +746,7 @@ function handleMobileAudioPlay() {
     // Additional iOS-specific handling
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
     if (isIOS) {
-        console.log("iOS device detected, preparing audio system");
+        if (window.config && window.config.debugLogging) console.log("iOS device detected, preparing audio system");
         
         try {
             // Make sure we're prepared for later playback
@@ -718,7 +758,7 @@ function handleMobileAudioPlay() {
                 window.backgroundMusicElement.setAttribute('playsinline', '');
                 window.backgroundMusicElement.setAttribute('webkit-playsinline', '');
                 
-                console.log("iOS audio system prepared, music will play during gameplay");
+                if (window.config && window.config.debugLogging) console.log("iOS audio system prepared, music will play during gameplay");
                 
                 // If we have a special iOS button, hide it
                 const iosButton = document.getElementById('ios-music-button');
@@ -740,10 +780,9 @@ function handleMobileAudioPlay() {
         }
     } else {
         // Standard approach for non-iOS mobile devices
-        console.log("Non-iOS mobile device, audio system prepared for later playback");
+        if (window.config && window.config.debugLogging) console.log("Non-iOS mobile device, audio system prepared for later playback");
     }
 }
-
 // Create a special play button for iOS if absolutely needed
 function createIOSMusicButton() {
     // Skip button if not on iOS
@@ -793,7 +832,7 @@ function createIOSMusicButton() {
         // Try to resume audio context
         if (window.audioContext) {
             window.audioContext.resume().then(() => {
-                console.log("Audio context resumed from iOS button");
+                if (window.config && window.config.debugLogging) console.log("Audio context resumed from iOS button");
             }).catch(err => {
                 console.warn("Could not resume audio context from button:", err);
             });
@@ -812,7 +851,7 @@ function createIOSMusicButton() {
             oscillator.start();
             setTimeout(() => {
                 oscillator.stop();
-                console.log("Test beep played - audio should be unlocked");
+                if (window.config && window.config.debugLogging) console.log("Test beep played - audio should be unlocked");
             }, 200);
         } catch (e) {
             console.warn("Failed to play test beep:", e);
@@ -829,7 +868,7 @@ function createIOSMusicButton() {
                     setTimeout(() => {
                         window.backgroundMusicElement.pause();
                         window.backgroundMusicElement.currentTime = 0;
-                        console.log("iOS audio fully unlocked for gameplay");
+                        if (window.config && window.config.debugLogging) console.log("iOS audio fully unlocked for gameplay");
                     }, 50);
                 })
                 .catch(error => {
@@ -845,7 +884,7 @@ function createIOSMusicButton() {
     });
     
     document.body.appendChild(button);
-    console.log("iOS music button created");
+    if (window.config && window.config.debugLogging) console.log("iOS music button created");
 }
 
 // Create a button to manually start music (for browsers with restrictive autoplay policies)
@@ -963,7 +1002,7 @@ function createVolumeControl() {
 
 // Initialize UI elements
 function initUI() {
-    console.log("Initializing UI");
+    if (window.config && window.config.debugLogging) console.log("Initializing UI");
     
     // Ensure UI container has proper z-index
     const uiContainer = document.getElementById('ui-container');
@@ -985,11 +1024,11 @@ function initUI() {
         // Add event listener for start button with immediate loading animation
         newStartButton.addEventListener('click', function(event) {
             event.preventDefault();
-            console.log("Start button clicked from main menu");
+            if (window.config && window.config.debugLogging) console.log("Start button clicked from main menu");
             
             // CRITICAL: Direct audio unlock immediately on click for mobile
             if (isMobileDevice()) {
-                console.log("Mobile device detected, starting aggressive audio unlock");
+                if (window.config && window.config.debugLogging) console.log("Mobile device detected, starting aggressive audio unlock");
                 
                 // Create and immediately play a silent sound - MUST happen directly in click handler
                 if (window.audioContext) {
@@ -1145,7 +1184,7 @@ function playCountdownBeep(isGo = false) {
             // Higher pitched, brighter sound for GO
             oscillator.type = 'square';
             oscillator.frequency.value = 880; // A5 - higher pitch for GO
-            gainNode.gain.value = 0.15;
+            gainNode.gain.value = 0.35;
             
             // Start with attack
             oscillator.start();
@@ -1154,7 +1193,7 @@ function playCountdownBeep(isGo = false) {
             oscillator.frequency.exponentialRampToValueAtTime(1200, window.audioContext.currentTime + 0.2);
             
             // Envelope - longer for GO
-            gainNode.gain.setValueAtTime(0.15, window.audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.4, window.audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, window.audioContext.currentTime + 0.5);
             
             // Stop after effect is done
@@ -1173,13 +1212,13 @@ function playCountdownBeep(isGo = false) {
             // Regular countdown beep (3, 2, 1)
             oscillator.type = 'sine';
             oscillator.frequency.value = 440; // A4
-            gainNode.gain.value = 0.1;
+            gainNode.gain.value = 0.25;
             
             // Start oscillator
             oscillator.start();
             
             // Envelope
-            gainNode.gain.setValueAtTime(0.1, window.audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.25, window.audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.001, window.audioContext.currentTime + 0.2);
             
             // Stop after effect is done
@@ -1544,7 +1583,6 @@ function startGame() {
         hideLoadingAnimation();
     }
 }
-
 // Clear existing game elements
 function clearGameElements() {
     if (!window.scene) {
@@ -1574,21 +1612,21 @@ function clearGameElements() {
         window.projectiles = [];
     }
     
-    // Clear other game objects
+    // Clear walls/instanced meshes and markers
     console.log("Clearing walls and other game objects");
-    const objectsToRemove = [];
+    const toRemove = [];
     window.scene.traverse(object => {
-        if (object.userData && (object.userData.type === 'wall' || 
-            object.userData.type === 'start' || 
-            object.userData.type === 'goal')) {
-            objectsToRemove.push(object);
+        if (
+            (object.isInstancedMesh) ||
+            (object.userData && (object.userData.type === 'wall' || object.userData.type === 'start' || object.userData.type === 'goal'))
+        ) {
+            toRemove.push(object);
         }
     });
-    
-    console.log("Removing", objectsToRemove.length, "objects from scene");
-    objectsToRemove.forEach(object => {
-        window.scene.remove(object);
-    });
+    console.log("Removing", toRemove.length, "objects from scene");
+    toRemove.forEach(object => window.scene.remove(object));
+    window.walls = [];
+    window.wallBoxes = [];
 }
 
 // Add new function to properly position the player at the start
@@ -1833,12 +1871,9 @@ function createWalls() {
             opacity: 0.7
         });
     } else {
-        // Full material complexity on desktop
-        wallMaterial = new THREE.MeshStandardMaterial({
-            color: 0x220033, // Deep purple base
-            emissive: 0x110022,
-            metalness: 0.7,
-            roughness: 0.3
+        // Cheaper shading on desktop for performance
+        wallMaterial = new THREE.MeshLambertMaterial({
+            color: 0x220033
         });
         
         edgeMaterial = new THREE.MeshBasicMaterial({
@@ -1858,45 +1893,105 @@ function createWalls() {
     // Clear existing walls
     window.walls = [];
     
-    // Create walls based on maze grid
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
-            if (window.mazeGrid[i][j] === 1) {
-                // Create main wall geometry
-                const wallGeometry = new THREE.BoxGeometry(corridorWidth, wallHeight, corridorWidth);
-                const wall = new THREE.Mesh(wallGeometry, wallMaterial.clone());
-                
-                // Position wall in world space
+    // Prepare instanced meshes for desktop; fallback to individual meshes on mobile
+    if (!isMobile) {
+        const wallGeometry = new THREE.BoxGeometry(corridorWidth, wallHeight, corridorWidth);
+        const wallInstanced = new THREE.InstancedMesh(wallGeometry, wallMaterial, size * size);
+        wallInstanced.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        wallInstanced.matrixAutoUpdate = false;
+        let wallCount = 0;
+
+        const topThickness = 0.08;
+        const topGeom = new THREE.BoxGeometry(corridorWidth, topThickness, corridorWidth);
+        const topMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.8 });
+        const topInstanced = new THREE.InstancedMesh(topGeom, topMat, size * size);
+        topInstanced.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        topInstanced.matrixAutoUpdate = false;
+        let topCount = 0;
+
+        const pillarThickness = 0.06;
+        const pillarGeom = new THREE.BoxGeometry(pillarThickness, wallHeight, pillarThickness);
+        const pillarMat = topMat;
+        // Up to 4 pillars per wall
+        const pillarsPerWall = 4;
+        const pillarInstanced = new THREE.InstancedMesh(pillarGeom, pillarMat, size * size * pillarsPerWall);
+        pillarInstanced.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        pillarInstanced.matrixAutoUpdate = false;
+        let pillarCount = 0;
+
+        window.wallBoxes = [];
+        const half = corridorWidth / 2;
+        const tempMatrix = new THREE.Matrix4();
+
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                if (window.mazeGrid[i][j] !== 1) continue;
                 const x = (i - size/2) * corridorWidth;
                 const z = (j - size/2) * corridorWidth;
-                wall.position.set(x, wallHeight/2, z);
-                
-                // Add grid pattern texture only on desktop
-                if (!isMobile && sharedGridTexture) {
-                    wall.material.map = sharedGridTexture;
-                    wall.material.needsUpdate = true;
+
+                // Wall instance transform
+                tempMatrix.identity();
+                tempMatrix.setPosition(x, wallHeight/2, z);
+                wallInstanced.setMatrixAt(wallCount++, tempMatrix);
+
+                // Top edge instance
+                tempMatrix.identity();
+                tempMatrix.setPosition(x, wallHeight/2 + topThickness/2, z);
+                topInstanced.setMatrixAt(topCount++, tempMatrix);
+
+                // Corner pillars (four corners)
+                const offset = half - pillarThickness/2;
+                const corners = [
+                    [ x +  offset, wallHeight/2 - wallHeight/2, z +  offset],
+                    [ x -  offset, wallHeight/2 - wallHeight/2, z +  offset],
+                    [ x +  offset, wallHeight/2 - wallHeight/2, z -  offset],
+                    [ x -  offset, wallHeight/2 - wallHeight/2, z -  offset]
+                ];
+                for (const [cx, cy, cz] of corners) {
+                    tempMatrix.identity();
+                    tempMatrix.setPosition(cx, cy + wallHeight/2, cz);
+                    pillarInstanced.setMatrixAt(pillarCount++, tempMatrix);
                 }
-                
-                // Add glowing edges with reduced complexity on mobile
-                if (isMobile) {
+
+                // Precompute AABB for collision (axis-aligned, world space)
+                const box = new THREE.Box3(
+                    new THREE.Vector3(x - half, 0, z - half),
+                    new THREE.Vector3(x + half, wallHeight, z + half)
+                );
+                window.wallBoxes.push(box);
+            }
+        }
+
+        wallInstanced.count = wallCount;
+        topInstanced.count = topCount;
+        pillarInstanced.count = pillarCount;
+        wallInstanced.instanceMatrix.needsUpdate = true;
+        topInstanced.instanceMatrix.needsUpdate = true;
+        pillarInstanced.instanceMatrix.needsUpdate = true;
+
+        window.scene.add(wallInstanced);
+        window.scene.add(topInstanced);
+        window.scene.add(pillarInstanced);
+    } else {
+        // Mobile: keep previous per-mesh approach
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                if (window.mazeGrid[i][j] === 1) {
+                    const wallGeometry = new THREE.BoxGeometry(corridorWidth, wallHeight, corridorWidth);
+                    const wall = new THREE.Mesh(wallGeometry, wallMaterial.clone());
+                    const x = (i - size/2) * corridorWidth;
+                    const z = (j - size/2) * corridorWidth;
+                    wall.position.set(x, wallHeight/2, z);
                     addSimpleGlowingEdges(wall, corridorWidth, wallHeight, edgeMaterial);
-                } else {
-                    addGlowingEdges(wall, x, z, corridorWidth, wallHeight);
+                    wall.userData = { type: 'wall', isWall: true };
+                    window.scene.add(wall);
+                    window.walls.push(wall);
                 }
-                
-                // Make sure walls are properly tagged
-                wall.userData = { 
-                    type: 'wall',
-                    isWall: true 
-                };
-                
-                window.scene.add(wall);
-                window.walls.push(wall);
             }
         }
     }
     
-    console.log(`Created ${window.walls.length} walls for ${isMobile ? "mobile" : "desktop"}`);
+    console.log(`Created ${isMobile ? window.walls.length + " mobile walls" : window.wallBoxes.length + " desktop wall instances"}`);
 }
 
 // Create a shared grid texture to avoid multiple canvas operations
@@ -1948,6 +2043,46 @@ function addSimpleGlowingEdges(wall, width, height, edgeMaterial) {
     const topEdge = new THREE.Mesh(topEdgeGeometry, edgeMaterial);
     topEdge.position.set(0, height/2 + 0.05, 0);
     wall.add(topEdge);
+}
+
+// Desktop glowing edges with modest geometry (top + slim vertical corners)
+function addGlowingEdges(wall, x, z, width, height) {
+    try {
+        // Reuse a basic material similar to mobile edge styling to keep cost low
+        const edgeMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff00ff,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        // Top frame (thin border around the top)
+        const topThickness = 0.08;
+        const topEdgeGeometry = new THREE.BoxGeometry(width, topThickness, width);
+        const topEdge = new THREE.Mesh(topEdgeGeometry, edgeMaterial);
+        topEdge.position.set(0, height/2 + topThickness/2, 0);
+        wall.add(topEdge);
+
+        // Four slim vertical corner pillars
+        const pillarThickness = 0.06;
+        const pillarHeight = height;
+        const half = width / 2 - pillarThickness/2;
+        const pillarGeometry = new THREE.BoxGeometry(pillarThickness, pillarHeight, pillarThickness);
+
+        const corners = [
+            [ half, 0,  half],
+            [-half, 0,  half],
+            [ half, 0, -half],
+            [-half, 0, -half]
+        ];
+
+        for (const [cx, cy, cz] of corners) {
+            const pillar = new THREE.Mesh(pillarGeometry, edgeMaterial);
+            pillar.position.set(cx, 0, cz);
+            wall.add(pillar);
+        }
+    } catch (e) {
+        console.error('addGlowingEdges error:', e);
+    }
 }
 
 // Create start and goal markers
@@ -2162,12 +2297,11 @@ function addOutlineToEnemy(enemy) {
     const outline = new THREE.Mesh(outlineGeometry, outlineMaterial);
     enemy.add(outline);
 }
-
 // Create explosion effect for defeated enemies
 function createExplosionEffect(position) {
     // Number of particles in explosion - significantly reduced for mobile
     const isMobile = isMobileDevice();
-    const baseParticleCount = isMobile ? 8 : 30; // Reduce particles by 75% on mobile
+    const baseParticleCount = isMobile ? 8 : 18; // reduce desktop count to lower stutter
     
     // Further reduce particles based on battery level and performance
     let particleCount = baseParticleCount;
@@ -2197,39 +2331,26 @@ function createExplosionEffect(position) {
         sharedOctaGeometry = new THREE.OctahedronGeometry(0.08, 0); // Smaller and no subdivisions
     }
     
-    // Create particles
+    // Create particles (reuse from pool when possible)
     for (let i = 0; i < particleCount; i++) {
-        // Use shared geometries on mobile for better performance
-        let geometry;
-        if (isMobile) {
-            // Use shared geometries to reduce memory allocation
-            geometry = (i % 2 === 0) ? sharedBoxGeometry : sharedOctaGeometry;
+        let particle = null;
+        if (window.explosionPool && window.explosionPool.length > 0) {
+            particle = window.explosionPool.pop();
+            particle.material.color.set(colors[Math.floor(Math.random() * colors.length)]);
+            particle.material.opacity = 1;
+            particle.visible = true;
         } else {
-            // Desktop can use more complex geometries
-            const geometryType = Math.floor(Math.random() * 3);
-            switch(geometryType) {
-                case 0:
-                    geometry = new THREE.TetrahedronGeometry(0.2, 0);
-                    break;
-                case 1:
-                    geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-                    break;
-                case 2:
-                    geometry = new THREE.OctahedronGeometry(0.15, 0);
-                    break;
+            let geometry;
+            if (isMobile) {
+                geometry = (i % 2 === 0) ? sharedBoxGeometry : sharedOctaGeometry;
+            } else {
+                geometry = (i % 2 === 0) ? (window.sharedExplosionGeomA || new THREE.TetrahedronGeometry(0.15, 0))
+                                         : (window.sharedExplosionGeomB || new THREE.BoxGeometry(0.15, 0.15, 0.15));
             }
+            const material = window.sharedExplosionMaterial.clone();
+            material.color.set(colors[Math.floor(Math.random() * colors.length)]);
+            particle = new THREE.Mesh(geometry, material);
         }
-        
-        // Random green color from color array
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        
-        const material = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 1
-        });
-        
-        const particle = new THREE.Mesh(geometry, material);
         
         // Position at explosion center
         particle.position.copy(position);
@@ -2263,18 +2384,15 @@ function createExplosionEffect(position) {
     window.explosionParticles = window.explosionParticles || [];
     window.explosionParticles.push(...particles);
     
-    // Add a flash of light - green to match particles, reduced intensity on mobile
-    const lightIntensity = isMobile ? 1.5 : 3;
-    const lightDistance = isMobile ? 6 : 10;
+    // Add a flash of light - simplify for desktop to reduce stutter
+    const lightIntensity = isMobile ? 1.0 : 1.5;
+    const lightDistance = isMobile ? 6 : 8;
     const explosionLight = new THREE.PointLight(0x00ff00, lightIntensity, lightDistance);
     explosionLight.position.copy(position);
     window.scene.add(explosionLight);
-    
-    // Remove light after a shorter time on mobile to save battery
-    const lightDuration = isMobile ? 150 : 300;
     setTimeout(() => {
         window.scene.remove(explosionLight);
-    }, lightDuration);
+    }, isMobile ? 120 : 180);
     
     // Play explosion sound
     playExplosionSound();
@@ -2573,6 +2691,9 @@ function handleProjectileHit(isLeftClick) {
 function updateExplosionParticles() {
     if (!window.explosionParticles || window.explosionParticles.length === 0) return;
     
+    // Reuse temp vector to reduce allocations
+    if (!window._tmpVel) window._tmpVel = new THREE.Vector3();
+
     for (let i = window.explosionParticles.length - 1; i >= 0; i--) {
         const particle = window.explosionParticles[i];
         
@@ -2580,14 +2701,15 @@ function updateExplosionParticles() {
         particle.userData.lifetime -= window.delta;
         
         if (particle.userData.lifetime <= 0) {
-            // Remove expired particle
-            window.scene.remove(particle);
+            // Pool expired particle
+            if (particle.parent) particle.parent.remove(particle);
+            particle.visible = false;
+            if (window.explosionPool) window.explosionPool.push(particle);
             window.explosionParticles.splice(i, 1);
         } else {
-            // Move particle based on velocity
-            particle.position.add(
-                particle.userData.velocity.clone().multiplyScalar(window.delta)
-            );
+            // Move particle based on velocity (no per-frame clone)
+            window._tmpVel.copy(particle.userData.velocity).multiplyScalar(window.delta);
+            particle.position.add(window._tmpVel);
             
             // Rotate particle
             particle.rotation.x += particle.userData.rotation.x;
@@ -2663,6 +2785,13 @@ function initControls() {
     
     // Add mouse event listeners for shooting
     document.addEventListener('mousedown', onMouseDown);
+
+    // Prevent right-click context menu during gameplay when pointer is locked
+    document.addEventListener('contextmenu', function(e) {
+        if (window.controls && window.controls.isLocked && window.gameState && window.gameState.started && !window.gameState.paused) {
+            e.preventDefault();
+        }
+    });
     
     // Initialize mobile controls if on a mobile device
     if (isMobileDevice()) {
@@ -2674,6 +2803,15 @@ function initControls() {
 
 // Mobile device detection
 function isMobileDevice() {
+    // Prefer global device util if provided by index.html
+    if (window.deviceUtils && typeof window.deviceUtils.isMobile === 'function') {
+        try {
+            return !!window.deviceUtils.isMobile();
+        } catch (_) {
+            // Fallback to local detection below on any error
+        }
+    }
+
     // Use multiple detection methods for better reliability
     
     // Method 1: User agent detection
@@ -2682,10 +2820,10 @@ function isMobileDevice() {
     
     // Method 2: Touch events and screen size
     const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const isSmallScreen = window.innerWidth <= 1024;
+    const isSmallScreen = window.innerWidth <= 768; // align with index.html threshold
     
     // Method 3: Media queries (most reliable)
-    const mobileMediaQuery = window.matchMedia("(max-width: 1024px), (pointer: coarse)");
+    const mobileMediaQuery = window.matchMedia("(max-width: 768px), (pointer: coarse)");
     const isMobileByMedia = mobileMediaQuery.matches;
     
     // Method 4: Platform detection
@@ -2714,7 +2852,7 @@ function isMobileDevice() {
 
 // Initialize mobile controls (joystick and attack buttons)
 function initMobileControls() {
-    console.log("Initializing mobile controls");
+    if (window.config && window.config.debugLogging) console.log("Initializing mobile controls");
     
     try {
         // Show mobile controls
@@ -2939,7 +3077,6 @@ function addTouchInstructions() {
     // Function intentionally left empty - mobile instructions overlay removed
     return;
 }
-
 // Initialize nipplejs joystick
 function initJoystick() {
     console.log("Initializing virtual joysticks");
@@ -3258,18 +3395,18 @@ function initAttackButtons() {
             return;
         }
         
-        console.log("Left attack button touched");
+    if (window.config && window.config.debugLogging) console.log("Left attack button touched");
         
         // Create projectile with left click equivalent
         createProjectile(true);
-    });
+    }, { passive: false });
     
     leftAttackBtn.addEventListener('touchend', function(e) {
         e.preventDefault();
         // Reset visual feedback
         this.style.transform = 'scale(1)';
         this.style.opacity = '0.8';
-    });
+    }, { passive: true });
     
     // Right attack button
     rightAttackBtn.addEventListener('touchstart', function(e) {
@@ -3285,20 +3422,20 @@ function initAttackButtons() {
             return;
         }
         
-        console.log("Right attack button touched");
+    if (window.config && window.config.debugLogging) console.log("Right attack button touched");
         
         // Create projectile with right click equivalent
         createProjectile(false);
-    });
+    }, { passive: false });
     
     rightAttackBtn.addEventListener('touchend', function(e) {
         e.preventDefault();
         // Reset visual feedback
         this.style.transform = 'scale(1)';
         this.style.opacity = '0.8';
-    });
+    }, { passive: true });
     
-    console.log("Attack buttons initialized");
+    if (window.config && window.config.debugLogging) console.log("Attack buttons initialized");
 }
 
 // Handle keydown events
@@ -3375,16 +3512,17 @@ function onMouseDown(event) {
 
 // Create a projectile
 function createProjectile(isLeftClick) {
-    // Create projectile geometry and material
-    const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-    const projectileMaterial = new THREE.MeshBasicMaterial({
-        color: isLeftClick ? 0x00ffff : 0xff00ff,
-        transparent: true,
-        opacity: 0.8
-    });
-    
-    // Create projectile mesh
-    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+    // Try to reuse from pool
+    let projectile = null;
+    if (window.projectilePool && window.projectilePool.length > 0) {
+        projectile = window.projectilePool.pop();
+        projectile.material = isLeftClick ? window.sharedProjectileMaterialLeft : window.sharedProjectileMaterialRight;
+        projectile.visible = true;
+    } else {
+        // Create projectile mesh from shared geometry/materials
+        const projectileMaterial = isLeftClick ? window.sharedProjectileMaterialLeft : window.sharedProjectileMaterialRight;
+        projectile = new THREE.Mesh(window.sharedProjectileGeometry, projectileMaterial);
+    }
     
     // Position at camera position - offset forward slightly to avoid immediate collisions
     projectile.position.copy(window.camera.position);
@@ -3543,35 +3681,46 @@ function updatePlayerMovement(delta) {
 
 // Handle collisions with walls
 function handleCollisions() {
-    // Get player position
-    const playerPosition = new THREE.Vector3();
+    // Reuse vectors to avoid allocations
+    if (!window._tmpPlayerPos) window._tmpPlayerPos = new THREE.Vector3();
+    if (!window._tmpBox) window._tmpBox = new THREE.Box3();
+    if (!window._tmpCenter) window._tmpCenter = new THREE.Vector3();
+    if (!window._tmpPush) window._tmpPush = new THREE.Vector3();
+    const playerPosition = window._tmpPlayerPos;
     window.camera.getWorldPosition(playerPosition);
     
     // Player collision radius
     const playerRadius = 0.5;
     
-    // Check collision with each wall
-    for (const wall of window.walls) {
-        // Get wall bounding box
-        const wallBox = new THREE.Box3().setFromObject(wall);
-        
-        // Expand box by player radius (simple approximation)
-        wallBox.min.x -= playerRadius;
-        wallBox.min.y -= playerRadius;
-        wallBox.min.z -= playerRadius;
-        wallBox.max.x += playerRadius;
-        wallBox.max.y += playerRadius;
-        wallBox.max.z += playerRadius;
-        
-        // Check if player intersects with expanded box
-        if (wallBox.containsPoint(playerPosition)) {
+    // Prefer precomputed AABBs (desktop instancing)
+    const boxes = (window.wallBoxes && window.wallBoxes.length) ? window.wallBoxes : null;
+    if (boxes) {
+        for (let k = 0; k < boxes.length; k++) {
+            const box = window._tmpBox.copy(boxes[k]);
+            box.min.x -= playerRadius; box.min.y -= playerRadius; box.min.z -= playerRadius;
+            box.max.x += playerRadius; box.max.y += playerRadius; box.max.z += playerRadius;
+            if (box.containsPoint(playerPosition)) {
+                const wallCenter = window._tmpCenter;
+                box.getCenter(wallCenter);
+                const pushDirection = window._tmpPush.subVectors(playerPosition, wallCenter).normalize();
+                pushDirection.y = 0;
+                window.camera.position.add(pushDirection.multiplyScalar(0.1));
+                window.velocity.set(0, 0, 0);
+                window.camera.position.y = window.gameState.playerStartPosition.y;
+            }
+        }
+    } else {
+        // Fallback to existing per-mesh approach (mobile)
+        for (const wall of window.walls) {
+            const wallBox = window._tmpBox.setFromObject(wall);
+            wallBox.min.x -= playerRadius; wallBox.min.y -= playerRadius; wallBox.min.z -= playerRadius;
+            wallBox.max.x += playerRadius; wallBox.max.y += playerRadius; wallBox.max.z += playerRadius;
+            if (wallBox.containsPoint(playerPosition)) {
             // Collision detected - calculate push direction
-            const wallCenter = new THREE.Vector3();
+            const wallCenter = window._tmpCenter;
             wallBox.getCenter(wallCenter);
             
-            const pushDirection = new THREE.Vector3()
-                .subVectors(playerPosition, wallCenter)
-                .normalize();
+            const pushDirection = window._tmpPush.subVectors(playerPosition, wallCenter).normalize();
                 
             // Ensure we only push in the XZ plane (horizontally)
             pushDirection.y = 0;
@@ -3586,6 +3735,7 @@ function handleCollisions() {
             
             // Ensure player Y position stays constant
             window.camera.position.y = window.gameState.playerStartPosition.y;
+            }
         }
     }
 }
@@ -3711,34 +3861,31 @@ function updateEnemyMovement(enemy, playerPosition, distance) {
         handleEnemyCollision(enemy);
     }
 }
-
 // New function to check if an enemy position collides with walls
 function checkEnemyWallCollision(enemy, newPosition) {
     // Enemy collision radius
     const enemyRadius = 0.5;
     
-    // Check collision with each wall
-    for (const wall of window.walls) {
-        // Get wall bounding box
-        const wallBox = new THREE.Box3().setFromObject(wall);
-        
-        // Expand box by enemy radius (simple approximation)
-        wallBox.min.x -= enemyRadius;
-        wallBox.min.y -= enemyRadius;
-        wallBox.min.z -= enemyRadius;
-        wallBox.max.x += enemyRadius;
-        wallBox.max.y += enemyRadius;
-        wallBox.max.z += enemyRadius;
-        
-        // Check if new position intersects with expanded box
-        if (wallBox.containsPoint(newPosition)) {
-            // Collision detected
-            return true;
+    // Prefer precomputed AABBs (desktop instancing)
+    const boxes = (window.wallBoxes && window.wallBoxes.length) ? window.wallBoxes : null;
+    if (boxes) {
+        for (let k = 0; k < boxes.length; k++) {
+            const box = boxes[k].clone();
+            box.min.x -= enemyRadius; box.min.y -= enemyRadius; box.min.z -= enemyRadius;
+            box.max.x += enemyRadius; box.max.y += enemyRadius; box.max.z += enemyRadius;
+            if (box.containsPoint(newPosition)) return true;
         }
+        return false;
+    } else {
+        // Fallback to mesh-based
+        for (const wall of window.walls) {
+            const wallBox = new THREE.Box3().setFromObject(wall);
+            wallBox.min.x -= enemyRadius; wallBox.min.y -= enemyRadius; wallBox.min.z -= enemyRadius;
+            wallBox.max.x += enemyRadius; wallBox.max.y += enemyRadius; wallBox.max.z += enemyRadius;
+            if (wallBox.containsPoint(newPosition)) return true;
+        }
+        return false;
     }
-    
-    // No collision detected
-    return false;
 }
 
 // Handle enemy collision with player
@@ -3825,7 +3972,10 @@ function updateHealthDisplay(health) {
     window.healthBar.style.width = `${health}%`;
     
     // Update health text
-    window.healthValue.textContent = `${health}%`;
+    const nextHealthText = `${health}%`;
+    if (window.healthValue.textContent !== nextHealthText) {
+        window.healthValue.textContent = nextHealthText;
+    }
     
     // Change color based on health level
     if (health <= 25) {
@@ -4292,15 +4442,16 @@ function animate() {
     const time = performance.now();
     window.delta = (time - window.prevTime) / 1000; // Convert to seconds
     
-    // Debug counter
+    // Debug/perf counters
     if (!window.frameCounter) window.frameCounter = 0;
     window.frameCounter++;
+    if (!window.fpsSamples) window.fpsSamples = [];
     
     // Reduce logging frequency for better performance - only log every 120 frames (2 seconds at 60fps)
     const isMobile = isMobileDevice();
     const logFrequency = isMobile ? 240 : 120; // Log less frequently on mobile
     
-    if (window.frameCounter % logFrequency === 0) {
+    if (window.config.debugLogging && window.frameCounter % logFrequency === 0) {
         console.log("Animation frame:", window.frameCounter, "Game state:", 
                     window.gameState.started ? "Started" : "Not started",
                     window.gameState.paused ? "Paused" : "Running");
@@ -4309,7 +4460,7 @@ function animate() {
         const canvas = document.querySelector('canvas');
         if (canvas) {
             // Only log detailed canvas info on desktop to reduce mobile overhead
-            if (!isMobile) {
+            if (window.config.debugLogging && !isMobile) {
                 console.log("Canvas display:", canvas.style.display, "Canvas z-index:", canvas.style.zIndex);
             }
             
@@ -4320,7 +4471,7 @@ function animate() {
                 fixZIndexLayers();
             }
         } else {
-            console.error("Canvas not found in animation loop");
+            if (window.config.debugLogging) console.error("Canvas not found in animation loop");
         }
         
         // Run audio resource cleanup less frequently on mobile to save battery
@@ -4328,6 +4479,66 @@ function animate() {
         // Run audio resource cleanup periodically 
         if (window.frameCounter % cleanupFrequency === 0) {
             cleanupAudioResources();
+        }
+    }
+
+    // Adaptive pixel ratio scaler
+    if (window.renderer) {
+        // FPS sample (instantaneous)
+        if (window.delta > 0) {
+            const fps = 1 / window.delta;
+            window.fpsSamples.push(fps);
+            if (window.fpsSamples.length > 60) window.fpsSamples.shift(); // ~1 second window at 60fps
+        }
+        if (!window.lastDprAdjustFrame) window.lastDprAdjustFrame = 0;
+        // Adjust every ~2 seconds
+        if (window.frameCounter - window.lastDprAdjustFrame >= 120 && window.fpsSamples.length > 0) {
+            window.lastDprAdjustFrame = window.frameCounter;
+            const avgFps = window.fpsSamples.reduce((a,b)=>a+b,0) / window.fpsSamples.length;
+            let currentRatio = window.renderer.getPixelRatio ? window.renderer.getPixelRatio() : (window._cachedPixelRatio || 1);
+            let target = currentRatio;
+            if (isMobile) {
+                // Mobile: keep fidelity, adjust within 0.7..1.0
+                if (avgFps < 50) target = Math.max(0.7, currentRatio - 0.1);
+                else if (avgFps > 58) target = Math.min(1.0, currentRatio + 0.05);
+            } else {
+                // Desktop: adjust within 1.0..1.5
+                if (avgFps < 50) target = Math.max(1.0, currentRatio - 0.1);
+                else if (avgFps > 58) target = Math.min(1.5, currentRatio + 0.1);
+            }
+            if (Math.abs(target - currentRatio) >= 0.09) {
+                window.renderer.setPixelRatio(target);
+                window._cachedPixelRatio = target;
+                window.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            // reset sample window to react faster to new conditions
+            window.fpsSamples.length = 0;
+        }
+    }
+
+    // Lightweight frame pacing: drop render every other frame if sustained below 30–33ms on mobile
+    if (isMobile) {
+        if (!window._mobileFpsSamples) window._mobileFpsSamples = [];
+        if (window.delta > 0) {
+            const frameMs = window.delta * 1000;
+            window._mobileFpsSamples.push(frameMs);
+            if (window._mobileFpsSamples.length > 90) window._mobileFpsSamples.shift(); // ~1.5s window
+        }
+        const avgMs = window._mobileFpsSamples.length
+            ? window._mobileFpsSamples.reduce((a,b)=>a+b,0) / window._mobileFpsSamples.length
+            : 16.7;
+        const shouldHalfRate = avgMs > 33; // sustained below ~30 FPS
+        if (shouldHalfRate) {
+            if (!window._halfRateToggle) window._halfRateToggle = false;
+            window._halfRateToggle = !window._halfRateToggle;
+        } else {
+            window._halfRateToggle = false;
+        }
+        // When in half-rate mode, skip every other render and heavy updates
+        if (window._halfRateToggle) {
+            // still update timers/counters minimally
+            window.prevTime = time;
+            return; // skip rest of loop (render + heavy updates) this frame
         }
     }
     
@@ -4376,7 +4587,7 @@ function animate() {
             window.renderer.render(window.scene, window.camera);
             
             // Only log successful renders every 60 frames
-            if (window.frameCounter % 60 === 0) {
+            if (window.config.debugLogging && window.frameCounter % 60 === 0) {
                 console.log("Scene rendered successfully");
             }
         } catch (err) {
@@ -4414,7 +4625,6 @@ function animate() {
     // Store time for next frame
     window.prevTime = time;
 }
-
 // Update all projectiles in the scene
 function updateProjectiles(delta) {
     // Early exit if no projectiles
@@ -4457,8 +4667,11 @@ function updateProjectiles(delta) {
                 console.log("Missed projectile! Penalty applied. Total missed:", window.gameState.missedProjectiles);
             }
             
-            window.scene.remove(projectile);
+            // Pool instead of disposing
+            projectile.visible = false;
+            if (projectile.parent) projectile.parent.remove(projectile);
             window.projectiles.splice(i, 1);
+            if (window.projectilePool) window.projectilePool.push(projectile);
             continue;
         }
         
@@ -4503,18 +4716,14 @@ function updateProjectiles(delta) {
                 
                 if (hit || directHit) {
                     console.log("Projectile hit enemy at distance:", directDistance);
-                    
-                    // Handle hit - if enemy is playing interval, the hit will be queued
                     const isLeftClick = projectile.userData.isLeftClick;
                     handleProjectileHit(isLeftClick);
-                    
-                    // Visual feedback for hits even if they're queued
-                    // Create a small flash at the hit point
                     createHitFlash(projectile.position.clone());
-                    
-                    // Remove projectile regardless
-                    window.scene.remove(projectile);
+                    // Pool instead of disposing
+                    projectile.visible = false;
+                    if (projectile.parent) projectile.parent.remove(projectile);
                     window.projectiles.splice(i, 1);
+                    if (window.projectilePool) window.projectilePool.push(projectile);
                 }
             }
         }
@@ -4558,32 +4767,29 @@ function initThreeJS() {
         
         // Create renderer with mobile-optimized settings
         const rendererOptions = {
-            antialias: !isMobile, // Disable antialiasing on mobile for better performance
-            alpha: true,
-            powerPreference: isMobile ? "low-power" : "high-performance", // Battery optimization
-            precision: isMobile ? "mediump" : "highp" // Lower precision on mobile
+            antialias: false,
+            alpha: false,
+            powerPreference: isMobile ? "high-performance" : "high-performance",
+            precision: isMobile ? "mediump" : "highp",
+            stencil: false,
+            depth: true,
+            preserveDrawingBuffer: false
         };
         
         window.renderer = new THREE.WebGLRenderer(rendererOptions);
         window.renderer.setSize(window.innerWidth, window.innerHeight);
         window.renderer.setClearColor(0x000033, 1); // Set clear color to dark blue
         
-        // Disable expensive shadow features on mobile
-        if (!isMobile) {
-            window.renderer.shadowMap.enabled = true;
-            window.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        }
+        // Disable shadows by default on desktop for smoothness; can re-enable via a setting later
+        window.renderer.shadowMap.enabled = false;
         
         // Set pixel ratio for device compatibility, but cap it for performance
-        const pixelRatio = Math.min(window.devicePixelRatio, isMobile ? 1.25 : 3);
+        const pixelRatio = Math.min(window.devicePixelRatio, isMobile ? 1.0 : 1.5);
         window.renderer.setPixelRatio(pixelRatio);
         
-        // Additional mobile performance optimizations
-        if (isMobile) {
-            // Disable expensive WebGL features for better performance
-            window.renderer.sortObjects = false; // Disable object sorting
-            window.renderer.autoClear = true;
-        }
+        // Additional performance optimizations
+        window.renderer.sortObjects = false; // Disable object sorting on all devices
+        window.renderer.autoClear = true;
         
         // Style and position the canvas properly
         const canvas = window.renderer.domElement;
@@ -4645,11 +4851,15 @@ function createSynthwaveSky() {
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.5;
+    ground.matrixAutoUpdate = false;
+    ground.updateMatrix();
     window.scene.add(ground);
     
     // Create enhanced grid with perspective effect
     const gridHelper = new THREE.GridHelper(groundSize, 100, 0xff00ff, 0x00ffff);
     gridHelper.position.y = -0.48; // Slightly above ground
+    gridHelper.matrixAutoUpdate = false;
+    gridHelper.updateMatrix();
     window.scene.add(gridHelper);
     
     console.log("Minimalist synthwave sky created");
@@ -5030,85 +5240,26 @@ function createCrosshair() {
 // Play success sound
 function playSuccessSound() {
     if (!window.audioContext) return;
-    
     try {
-        // Create audio nodes
-        const gainNode = window.audioContext.createGain();
-        
-        // Create a noise source for non-tonal sound that contrasts with interval sounds
-        const bufferSize = window.audioContext.sampleRate * 0.4; // 0.4 second buffer
-        const noiseBuffer = window.audioContext.createBuffer(1, bufferSize, window.audioContext.sampleRate);
-        const output = noiseBuffer.getChannelData(0);
-        
-        // Fill with noise but shape it for an explosive character
-        for (let i = 0; i < bufferSize; i++) {
-            // Create a decay curve for the noise amplitude
-            const decay = 1.0 - (i / bufferSize);
-            // Sharper attack at the beginning
-            const envelope = i < 2000 ? Math.min(1.0, i / 2000) * decay * decay : decay * decay;
-            // Add randomness but with some spectral shaping
-            output[i] = (Math.random() * 2 - 1) * envelope;
+        // Prefer pooled buffer (mobile) or cached buffer (desktop)
+        if (window.audioBufferPool && window.audioBufferPool.successBuffers && window.audioBufferPool.successBuffers.length > 0) {
+            playBufferedSound(window.audioBufferPool.successBuffers, 0.35);
+            return;
         }
-        
-        // Create noise source
-        const noiseSource = window.audioContext.createBufferSource();
-        noiseSource.buffer = noiseBuffer;
-        
-        // Create a bandpass filter to shape the noise into a "whoosh" sound
-        const bandpass = window.audioContext.createBiquadFilter();
-        bandpass.type = 'bandpass';
-        bandpass.frequency.value = 1600; // Mid-high frequency focus
-        bandpass.Q.value = 0.8; // Wider bandwidth
-        
-        // Create a highpass filter to remove low rumble
-        const highpass = window.audioContext.createBiquadFilter();
-        highpass.type = 'highpass';
-        highpass.frequency.value = 600;
-        
-        // Create a small reverb-like effect for a more "explosive" character
-        const delay = window.audioContext.createDelay(0.1);
-        delay.delayTime.value = 0.04;
-        
-        const delayGain = window.audioContext.createGain();
-        delayGain.gain.value = 0.15;
-        
-        // Connect the chain
-        noiseSource.connect(bandpass);
-        bandpass.connect(highpass);
-        
-        // Main signal path
-        highpass.connect(gainNode);
-        
-        // Delay path for reverb effect
-        highpass.connect(delay);
-        delay.connect(delayGain);
-        delayGain.connect(gainNode);
-        
-        gainNode.connect(window.audioContext.destination);
-        
-        // Set gain envelope with a sharp attack
-        const now = window.audioContext.currentTime;
-        gainNode.gain.setValueAtTime(0.01, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.6, now + 0.03); // Very sharp attack
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4); // Longer decay
-        
-        // Play the sound
-        noiseSource.start();
-        noiseSource.stop(now + 0.5);
-        
-        // Clean up resources
-        setTimeout(() => {
-            try {
-                noiseSource.disconnect();
-                bandpass.disconnect();
-                highpass.disconnect();
-                delay.disconnect();
-                delayGain.disconnect();
-                gainNode.disconnect();
-            } catch (e) {
-                // Ignore errors if nodes are already disconnected
-            }
-        }, 600);
+        if (!window.cachedSuccessBuffer) {
+            window.cachedSuccessBuffer = createSuccessSoundBuffer();
+        }
+        if (!window.cachedSuccessBuffer) return;
+        const source = window.audioContext.createBufferSource();
+        const gain = window.audioContext.createGain();
+        source.buffer = window.cachedSuccessBuffer;
+        source.connect(gain);
+        gain.connect(window.audioContext.destination);
+        gain.gain.value = 0.35;
+        source.start();
+        source.onended = () => {
+            try { source.disconnect(); gain.disconnect(); } catch (_) {}
+        };
     } catch (error) {
         console.error("Error playing success sound:", error);
     }
@@ -5117,30 +5268,23 @@ function playSuccessSound() {
 // Play error sound
 function playErrorSound() {
     if (!window.audioContext) return;
-    
     try {
-        const osc1 = window.audioContext.createOscillator();
-        const osc2 = window.audioContext.createOscillator();
+        if (window.audioBufferPool && window.audioBufferPool.errorBuffers && window.audioBufferPool.errorBuffers.length > 0) {
+            playBufferedSound(window.audioBufferPool.errorBuffers, 0.95);
+            return;
+        }
+        if (!window.cachedErrorBuffer) {
+            window.cachedErrorBuffer = createErrorSoundBuffer();
+        }
+        if (!window.cachedErrorBuffer) return;
+        const source = window.audioContext.createBufferSource();
         const gain = window.audioContext.createGain();
-        
-        osc1.type = 'sawtooth';
-        osc1.frequency.value = 220;
-        osc1.connect(gain);
-        
-        osc2.type = 'sawtooth';
-        osc2.frequency.value = 233;
-        osc2.connect(gain);
-        
+        source.buffer = window.cachedErrorBuffer;
+        source.connect(gain);
         gain.connect(window.audioContext.destination);
-        gain.gain.value = 0.1;
-        
-        osc1.start();
-        osc2.start();
-        
-        setTimeout(() => {
-            osc1.stop();
-            osc2.stop();
-        }, 300);
+        gain.gain.value = 0.95;
+        source.start();
+        source.onended = () => { try { source.disconnect(); gain.disconnect(); } catch (_) {} };
     } catch (error) {
         console.error("Error playing error sound:", error);
     }
@@ -5215,7 +5359,6 @@ function createDamageFlash() {
         }
     }, 50);
 }
-
 // Activate an enemy
 function activateEnemy(enemy) {
     console.log("Activating enemy");
@@ -5247,11 +5390,15 @@ function activateEnemy(enemy) {
     // Store the correct interval in the enemy's userData for later reference
     enemy.userData.correctInterval = correctInterval;
     
-    // Play the interval
-    playMelodicInterval(correctInterval);
+    // Slightly defer interval playback to avoid overlapping with explosion/success events
+    setTimeout(() => {
+        playMelodicInterval(correctInterval);
+    }, 20);
     
-    // Show the interval options - let showIntervalOptions handle the incorrect interval selection
-    showIntervalOptions(correctInterval);
+    // Slightly defer UI update as well to avoid layout jank on kill
+    setTimeout(() => {
+        showIntervalOptions(correctInterval);
+    }, 20);
     
     // Make enemy pulse/glow
     const originalScale = enemy.scale.clone();
@@ -5728,16 +5875,16 @@ function createFloor() {
     
     // Add a floor plane
     const floorGeometry = new THREE.PlaneGeometry(gridSize, gridSize);
-    const floorMaterial = new THREE.MeshStandardMaterial({ 
+    const floorMaterial = new THREE.MeshLambertMaterial({ 
         color: 0x0b0b2a, 
-        side: THREE.DoubleSide,
-        roughness: 0.8,
-        metalness: 0.2
+        side: THREE.DoubleSide
     });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
     floor.position.y = -0.01; // Slightly below grid to avoid z-fighting
-    floor.receiveShadow = true;
+    floor.receiveShadow = false;
+    floor.matrixAutoUpdate = false;
+    floor.updateMatrix();
     window.scene.add(floor);
     
     console.log("Floor created");
@@ -6002,7 +6149,6 @@ function calculateFinalScore() {
     
     return Math.floor(score);
 }
-
 // Add after createHealthDisplay function
 function createTimeAndScoreDisplay() {
     console.log("Creating time and score display");
@@ -6089,22 +6235,35 @@ function updateTimeDisplay() {
     }
     
     const currentTime = Date.now();
+    if (!window._lastTimeUI || currentTime - window._lastTimeUI >= 100) {
+        window._lastTimeUI = currentTime;
+    } else {
+        return; // throttle to ~10Hz
+    }
     const elapsedSeconds = Math.floor((currentTime - window.gameState.startTime) / 1000);
     const minutes = Math.floor(elapsedSeconds / 60);
     const seconds = elapsedSeconds % 60;
     
     // Format and update the display
     const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    window.timeValue.textContent = timeString;
+    if (window.timeValue.textContent !== timeString) {
+        window.timeValue.textContent = timeString;
+    }
 }
 
 // Add function to update score display
 function updateScoreDisplay() {
     if (!window.scoreValue) return;
+    const now = Date.now();
+    if (window._lastScoreUI && now - window._lastScoreUI < 100) return;
+    window._lastScoreUI = now;
     
     // Calculate current score
     const currentScore = calculateCurrentScore();
-    window.scoreValue.textContent = currentScore.toString();
+    const nextScore = currentScore.toString();
+    if (window.scoreValue.textContent !== nextScore) {
+        window.scoreValue.textContent = nextScore;
+    }
 }
 
 // Add function to calculate current score during gameplay
@@ -6152,7 +6311,13 @@ function calculateCurrentScore() {
 // Update enemies defeated display
 function updateEnemiesDisplay() {
     if (!window.enemiesValue) return;
-    window.enemiesValue.textContent = window.gameState.enemiesDefeated;
+    const now = Date.now();
+    if (window._lastEnemiesUI && now - window._lastEnemiesUI < 100) return;
+    window._lastEnemiesUI = now;
+    const nextEnemies = String(window.gameState.enemiesDefeated);
+    if (window.enemiesValue.textContent !== nextEnemies) {
+        window.enemiesValue.textContent = nextEnemies;
+    }
 }
 
 // Modify the existing instructions to include level selection
@@ -6769,7 +6934,6 @@ function togglePauseMenu() {
     
     console.log("Pause state toggled to:", window.gameState.paused);
 }
-
 // Function to fix UI element layering
 function fixZIndexLayers() {
     console.log("Fixing z-index layering");
@@ -7369,210 +7533,21 @@ window.audioBufferPool = {
     initialized: false
 };
 
-// Initialize audio buffer pool for sound effects
-function initAudioBufferPool() {
-    if (!window.audioBufferPool || window.audioBufferPool.initialized) return;
-    
-    console.log("Initializing audio buffer pool for sound effects...");
-    
-    // Only initialize on mobile devices for performance optimization
-    if (!isMobileDevice()) {
-        console.log("Skipping buffer pool on desktop - using real-time generation");
-        return;
-    }
-    
-    // Wait for audio context to be available
-    const initBuffers = () => {
-        if (!window.audioContext) return;
-        
-        try {
-            // Pre-generate explosion sound buffers (3 variations)
-            for (let i = 0; i < 3; i++) {
-                const buffer = createExplosionSoundBuffer();
-                if (buffer) window.audioBufferPool.explosionBuffers.push(buffer);
-            }
-            
-            // Pre-generate success sound buffers (2 variations)
-            for (let i = 0; i < 2; i++) {
-                const buffer = createSuccessSoundBuffer();
-                if (buffer) window.audioBufferPool.successBuffers.push(buffer);
-            }
-            
-            // Pre-generate error sound buffers (2 variations)
-            for (let i = 0; i < 2; i++) {
-                const buffer = createErrorSoundBuffer();
-                if (buffer) window.audioBufferPool.errorBuffers.push(buffer);
-            }
-            
-            window.audioBufferPool.initialized = true;
-            console.log("Audio buffer pool initialized successfully with", 
-                       window.audioBufferPool.explosionBuffers.length, "explosion buffers,",
-                       window.audioBufferPool.successBuffers.length, "success buffers,",
-                       window.audioBufferPool.errorBuffers.length, "error buffers");
-        } catch (error) {
-            console.error("Error initializing audio buffer pool:", error);
-        }
-    };
-    
-    // Try to initialize buffers with delay
-        if (window.audioContext) {
-        setTimeout(initBuffers, 500);
-    } else {
-        const checkAudioContext = setInterval(() => {
-            if (window.audioContext) {
-                clearInterval(checkAudioContext);
-                setTimeout(initBuffers, 500);
-            }
-        }, 100);
-    }
-}
-
-// Create pre-generated explosion sound buffer
-function createExplosionSoundBuffer() {
-    try {
-        if (!window.audioContext) return null;
-        
-        const sampleRate = window.audioContext.sampleRate;
-        const duration = 0.6;
-        const buffer = window.audioContext.createBuffer(1, sampleRate * duration, sampleRate);
-        const data = buffer.getChannelData(0);
-        
-        // Generate explosion sound with slight variation
-        const variation = Math.random() * 0.3 + 0.85;
-        
-        for (let i = 0; i < data.length; i++) {
-            const t = i / sampleRate;
-            const frequency = 120 * Math.exp(-t * 3) * variation;
-            const amplitude = Math.exp(-t * 2.5) * 0.1;
-            data[i] = amplitude * (Math.random() * 2 - 1) * Math.sin(2 * Math.PI * frequency * t);
-        }
-        
-        return buffer;
-    } catch (error) {
-        console.error("Error creating explosion buffer:", error);
-        return null;
-    }
-}
-
-// Create pre-generated success sound buffer
-function createSuccessSoundBuffer() {
-    try {
-        if (!window.audioContext) return null;
-        
-        const sampleRate = window.audioContext.sampleRate;
-        const duration = 0.5;
-        const buffer = window.audioContext.createBuffer(1, sampleRate * duration, sampleRate);
-        const data = buffer.getChannelData(0);
-        
-        // Success sound: ascending notes C5, E5, G5
-        const frequencies = [523, 659, 784];
-        const noteDuration = duration / frequencies.length;
-        
-        for (let i = 0; i < data.length; i++) {
-            const t = i / sampleRate;
-            const noteIndex = Math.floor(t / noteDuration);
-            const noteTime = t - (noteIndex * noteDuration);
-            
-            if (noteIndex < frequencies.length) {
-                const envelope = Math.exp(-noteTime * 8);
-                const frequency = frequencies[noteIndex];
-                data[i] = envelope * 0.1 * Math.sin(2 * Math.PI * frequency * noteTime);
-            }
-        }
-        
-        return buffer;
-    } catch (error) {
-        console.error("Error creating success buffer:", error);
-        return null;
-    }
-}
-
-// Create pre-generated error sound buffer
-function createErrorSoundBuffer() {
-    try {
-        if (!window.audioContext) return null;
-        
-        const sampleRate = window.audioContext.sampleRate;
-        const duration = 0.3;
-        const buffer = window.audioContext.createBuffer(1, sampleRate * duration, sampleRate);
-        const data = buffer.getChannelData(0);
-        
-        // Error sound: descending buzz
-        for (let i = 0; i < data.length; i++) {
-            const t = i / sampleRate;
-            const envelope = Math.exp(-t * 5);
-            const frequency = 200 * (1 - t * 0.7);
-            const buzz = Math.sin(2 * Math.PI * frequency * t) + 0.3 * Math.sin(2 * Math.PI * frequency * 3 * t);
-            data[i] = envelope * 0.1 * buzz;
-        }
-        
-        return buffer;
-    } catch (error) {
-        console.error("Error creating error buffer:", error);
-        return null;
-    }
-}
-
-// Play sound from buffer pool with fallback to real-time generation
-function playBufferedSound(bufferArray, volume = 0.1, fallbackFunction = null) {
-    if (!window.audioContext) return false;
-    
-    // Try to use buffer pool first (mobile optimization)
-    if (isMobileDevice() && bufferArray && bufferArray.length > 0) {
-        try {
-            const buffer = bufferArray[Math.floor(Math.random() * bufferArray.length)];
-            const source = window.audioContext.createBufferSource();
-            const gain = window.audioContext.createGain();
-            
-            source.buffer = buffer;
-            source.connect(gain);
-            gain.connect(window.audioContext.destination);
-            
-            gain.gain.value = volume;
-            source.start();
-            
-            source.onended = () => {
-                try {
-                    source.disconnect();
-                    gain.disconnect();
-                } catch (e) {
-                    // Ignore cleanup errors
-                }
-            };
-            
-            return true;
-        } catch (error) {
-            console.error("Error playing buffered sound:", error);
-        }
-    }
-    
-    // Fallback to real-time generation (desktop or if buffer pool failed)
-    if (fallbackFunction && typeof fallbackFunction === "function") {
-        try {
-            fallbackFunction();
-            return true;
-        } catch (error) {
-            console.error("Error with fallback sound function:", error);
-        }
-    }
-    
-    return false;
-} 
+// Duplicate audio buffer pool functions removed. Using implementations from buffer_pool.js
 // Function to show crosshair (only during gameplay)
 function showCrosshair() {
     if (window.crosshair) {
         window.crosshair.style.display = "flex";
-        console.log("Crosshair shown for gameplay");
+        if (window.config && window.config.debugLogging) console.log("Crosshair shown for gameplay");
     } else {
         console.warn("Crosshair not found - cannot show");
     }
 }
-
 // Function to hide crosshair (during menus/overlays)
 function hideCrosshair() {
     if (window.crosshair) {
         window.crosshair.style.display = "none";
-        console.log("Crosshair hidden");
+        if (window.config && window.config.debugLogging) console.log("Crosshair hidden");
     } else {
         console.warn("Crosshair not found - cannot hide");
     }

@@ -2,9 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
     <title>Interval Hunter - 3D Ear Training Game</title>
     <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100dvh;
+            overflow: hidden;
+            background: #0b0b2a;
+            overscroll-behavior: none;
+            touch-action: none;
+            -webkit-text-size-adjust: 100%;
+        }
         body { 
             margin: 0; 
             overflow: hidden; 
@@ -26,6 +40,15 @@
             user-select: none;
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
+            width: 100vw;
+            height: 100dvh;
+            touch-action: none;
+        }
+        :root {
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
         #ui-container {
             position: absolute;
@@ -1565,21 +1588,21 @@
     </div>
     
     <!-- Load Three.js from CDN - using stable version with UMD builds -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js" 
+    <script defer src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js" 
             crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js" 
+    <script defer src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/PointerLockControls.js" 
             crossorigin="anonymous"></script>
     
     <!-- Nipple.js for virtual joystick -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js" 
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js" 
             crossorigin="anonymous" 
             referrerpolicy="no-referrer"></script>
     
     <!-- Audio Buffer Pool System -->
-    <script src="buffer_pool.js"></script>
+    <script defer src="buffer_pool.js"></script>
     
     <!-- Main game script -->
-    <script src="game.js"></script>
+    <script defer src="game.js"></script>
     
     <!-- Add a fallback checker -->
     <script>
@@ -1593,19 +1616,19 @@
         });
     </script>
     
-    <!-- Load your game script after DOM is ready -->
+    <!-- UI helpers only; the main game is loaded via the deferred script tags above -->
     <script>
         // Show loading message
         const loadingMessage = document.getElementById('loading-message');
         const mobileControls = document.getElementById('mobile-controls');
-        
+
         // Detect if device is mobile
         function isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                   (typeof window.orientation !== "undefined") || 
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                   (typeof window.orientation !== "undefined") ||
                    window.innerWidth <= 768;
         }
-        
+
         // Make utility functions globally available for game.js
         window.deviceUtils = {
             isMobile: isMobileDevice,
@@ -1614,28 +1637,27 @@
                 setupMobileDetailToggles();
             }
         };
-        
+
         // Adjust UI for mobile/desktop
         function adjustUIForDevice() {
             const isMobile = isMobileDevice();
-            console.log("Device detected as: " + (isMobile ? "Mobile" : "Desktop"));
-            
+
             // Show/hide appropriate control instructions
             const desktopControls = document.querySelector('.desktop-controls');
             if (desktopControls) {
                 desktopControls.style.display = isMobile ? 'none' : 'block';
             }
-            
+
             // Show/hide mobile-only elements
             document.querySelectorAll('.mobile-only').forEach(el => {
                 el.style.display = isMobile ? 'block' : 'none';
             });
-            
+
             // Update interval option labels with error checking
             try {
                 const leftOptionSpan = document.querySelector('#left-option span');
                 const rightOptionSpan = document.querySelector('#right-option span');
-                
+
                 if (leftOptionSpan) {
                     leftOptionSpan.textContent = isMobile ? 'LEFT TAP' : 'LEFT CLICK';
                 }
@@ -1645,55 +1667,30 @@
             } catch (error) {
                 console.warn("Could not update interval option labels:", error);
             }
-            
+
             // Apply appropriate styles
             if (isMobile) {
                 document.body.classList.add('mobile-device');
                 if (mobileControls) {
                     mobileControls.style.display = 'block';
                 }
-                
-                // Add mobile indicator if in debug mode
-                if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-                    if (!document.getElementById('mobile-indicator')) {
-                        const mobileIndicator = document.createElement('div');
-                        mobileIndicator.id = 'mobile-indicator';
-                        mobileIndicator.style.position = 'fixed';
-                        mobileIndicator.style.top = '10px';
-                        mobileIndicator.style.right = '10px';
-                        mobileIndicator.style.background = 'rgba(255,0,255,0.8)';
-                        mobileIndicator.style.color = 'white';
-                        mobileIndicator.style.padding = '5px 10px';
-                        mobileIndicator.style.borderRadius = '5px';
-                        mobileIndicator.style.zIndex = '10000';
-                        mobileIndicator.style.fontSize = '12px';
-                        mobileIndicator.textContent = 'Mobile Mode';
-                        document.body.appendChild(mobileIndicator);
-                    }
-                }
             } else {
                 document.body.classList.remove('mobile-device');
                 if (mobileControls) {
                     mobileControls.style.display = 'none';
                 }
-                
-                // Remove mobile indicator if exists
-                const mobileIndicator = document.getElementById('mobile-indicator');
-                if (mobileIndicator) {
-                    mobileIndicator.remove();
-                }
             }
         }
-        
+
         // Setup detail toggles for mobile UI
         function setupMobileDetailToggles() {
             const detailToggles = document.querySelectorAll('.detail-toggle');
-            
+
             detailToggles.forEach(toggle => {
                 toggle.addEventListener('click', function() {
                     // Find the next element (the details container)
                     const detailsContainer = this.nextElementSibling;
-                    
+
                     // Toggle visibility
                     if (detailsContainer.classList.contains('visible')) {
                         detailsContainer.classList.remove('visible');
@@ -1705,79 +1702,31 @@
                 });
             });
         }
-        
+
         // Wait for DOM to be fully loaded
         window.addEventListener('DOMContentLoaded', () => {
-            loadingMessage.textContent = "DOM loaded, loading game script...";
-            
             // Remove mobile controls info explanation
             const mobileControlsInfo = document.querySelector('.mobile-controls-info');
             if (mobileControlsInfo) {
                 mobileControlsInfo.style.display = 'none';
-                mobileControlsInfo.innerHTML = ''; // Clear the content
+                mobileControlsInfo.innerHTML = '';
             }
-            
+
             // Remove joystick label
             const joystickLabel = document.getElementById('joystick-label');
             if (joystickLabel) {
                 joystickLabel.style.display = 'none';
             }
-            
+
             // Adjust UI based on device
             adjustUIForDevice();
-            
+
             // Setup mobile detail toggles
             setupMobileDetailToggles();
-            
+
             // Re-adjust on orientation change or resize
             window.addEventListener('resize', adjustUIForDevice);
             window.addEventListener('orientationchange', adjustUIForDevice);
-            
-            // Create script element for game.js
-            const gameScript = document.createElement('script');
-            gameScript.src = 'game.js?v=' + Date.now();
-            gameScript.type = 'text/javascript';
-            
-            // Handle errors loading game.js
-            gameScript.onerror = () => {
-                loadingMessage.textContent = "Error loading game script!";
-                loadingMessage.style.color = "red";
-            };
-            
-            // Handle successful load
-            gameScript.onload = () => {
-                loadingMessage.textContent = "Game script loaded, initializing...";
-                
-                // Make sure all game initialization happens after DOM is fully loaded
-                if (typeof initGame === 'function') {
-                    // Small delay to ensure everything is ready
-                    setTimeout(() => {
-                        try {
-                            initGame();
-                            
-                            // Re-check mobile status after game init
-                            setTimeout(adjustUIForDevice, 1000);
-                            
-                            loadingMessage.textContent = "Game initialized successfully!";
-                            setTimeout(() => {
-                                loadingMessage.style.opacity = "0";
-                                setTimeout(() => loadingMessage.style.display = "none", 1000);
-                            }, 2000);
-                        } catch (error) {
-                            loadingMessage.textContent = "Game initialization failed: " + error.message;
-                            loadingMessage.style.color = "red";
-                            console.error("Game initialization error:", error);
-                        }
-                    }, 100);
-                } else {
-                    loadingMessage.textContent = "Error: Game initialization function not found!";
-                    loadingMessage.style.color = "red";
-                }
-            };
-            
-            // Add script to document
-            document.body.appendChild(gameScript);
-            loadingMessage.textContent = "Game script requested...";
         });
     </script>
 </body>

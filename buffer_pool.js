@@ -10,11 +10,12 @@ window.audioBufferPool = {
 function initAudioBufferPool() {
     if (!window.audioBufferPool || window.audioBufferPool.initialized) return;
     
-    console.log("Initializing audio buffer pool for sound effects...");
+    if (window.config && window.config.debugLogging) console.log("Initializing audio buffer pool for SFX");
     
     // Only initialize on mobile devices for performance optimization
-    if (!isMobileDevice()) {
-        console.log("Skipping buffer pool on desktop - using real-time generation");
+    const isMobile = (window.deviceUtils && typeof window.deviceUtils.isMobile === 'function') ? !!window.deviceUtils.isMobile() : false;
+    if (!isMobile) {
+        if (window.config && window.config.debugLogging) console.log("Skipping buffer pool on desktop - using RT generation");
         return;
     }
     
@@ -42,10 +43,12 @@ function initAudioBufferPool() {
             }
             
             window.audioBufferPool.initialized = true;
-            console.log("Audio buffer pool initialized successfully with", 
-                       window.audioBufferPool.explosionBuffers.length, "explosion buffers,",
-                       window.audioBufferPool.successBuffers.length, "success buffers,",
-                       window.audioBufferPool.errorBuffers.length, "error buffers");
+            if (window.config && window.config.debugLogging) {
+                console.log("Audio buffer pool initialized", 
+                    window.audioBufferPool.explosionBuffers.length, "explosion",
+                    window.audioBufferPool.successBuffers.length, "success",
+                    window.audioBufferPool.errorBuffers.length, "error");
+            }
         } catch (error) {
             console.error("Error initializing audio buffer pool:", error);
         }
@@ -155,7 +158,8 @@ function playBufferedSound(bufferArray, volume = 0.1, fallbackFunction = null) {
     if (!window.audioContext) return false;
     
     // Try to use buffer pool first (mobile optimization)
-    if (isMobileDevice() && bufferArray && bufferArray.length > 0) {
+    const isMobile = (window.deviceUtils && typeof window.deviceUtils.isMobile === 'function') ? !!window.deviceUtils.isMobile() : false;
+    if (isMobile && bufferArray && bufferArray.length > 0) {
         try {
             const buffer = bufferArray[Math.floor(Math.random() * bufferArray.length)];
             const source = window.audioContext.createBufferSource();
